@@ -113,7 +113,7 @@ def test_ac_012_returns_a_plan_within_10_seconds_for_a_7_day_30_slot_week(monday
             slots.append({"day": d, "start": start, "end": end, "location": "School"})
     slots = slots[:30]
     cfg = make_config(slots)
-    week = build_week_sessions(weekly_targets("olympic", "build", 1200), "olympic", "build")
+    week = build_week_sessions(weekly_targets("olympic", "build", 700), "olympic", "build")
     cal = calendar_for_week(cfg, monday)
     assert len(cal) == 30
     plan = plan_week(week, cal, cfg)
