@@ -1,10 +1,14 @@
 """US-006: Export and experiment report (v0)."""
 
+from datetime import timedelta
+
 from conftest import make_config, make_session
 from icalendar import Calendar
 
+from planner.adherence import LogRow
 from planner.config import calendar_for_week
 from planner.export import export_week, to_fit
+from planner.report import completion_by, week_type, weekly_report
 from planner.solver import plan_week
 
 
@@ -63,11 +67,40 @@ def test_ac_025_exports_structured_workouts_as_fit_files_where_the_session_t(mon
     assert abs(sum(s.duration_time for s in steps) - 60 * 60) < 1
 
 
-def test_ac_026_experiment_mode_alternates_facility_aware_and_time_only_week():
+def test_ac_026_experiment_mode_alternates_facility_aware_and_time_only_week(monday):
     """AC-026 [unit-test]: Experiment mode alternates facility-aware and time-only weeks on a fixed schedule"""
-    raise NotImplementedError("Not implemented — AC-026 pending")
+    start = monday
+    types = [week_type(start + timedelta(weeks=i, days=3), start) for i in range(6)]
+    assert types == ["facility_aware", "time_only"] * 3
+    assert week_type(start - timedelta(weeks=1), start) == "facility_aware"  # before experiment
+    assert week_type(start + timedelta(weeks=1), None) == "facility_aware"  # experiment off
+    # A time-only plan ignores facilities, so it can put a swim where there's no pool.
+    cfg = make_config([{"day": "sat", "start": "08:00", "end": "11:00", "location": "Home"}])
+    swim = make_session("swim", "swim", 40)
+    naive = plan_week([swim], calendar_for_week(cfg, monday), cfg, facility_aware=False)
+    assert naive.status in ("optimal", "feasible") and not naive.placements[0].facility_ok
+    aware = plan_week([swim], calendar_for_week(cfg, monday), cfg)
+    assert aware.status == "infeasible"
 
 
-def test_ac_027_weekly_report_shows_completion_ratio_by_week_type_by_slot_an():
+def test_ac_027_weekly_report_shows_completion_ratio_by_week_type_by_slot_an(monday):
     """AC-027 [e2e-test]: Weekly report shows completion ratio by week type, by slot, and by discipline"""
-    raise NotImplementedError("Not implemented — AC-027 pending")
+    def r(week, wt, slot, disc, status, actual, planned=60):
+        return LogRow(on=week, week=week, session_id=f"{disc}-{slot}", discipline=disc,
+                      slot_key=slot, planned_min=planned, status=status, actual_min=actual,
+                      week_type=wt)
+    w2 = monday + timedelta(weeks=1)
+    rows = [
+        r(monday, "facility_aware", "mon-16:15@School", "swim", "done", 60),
+        r(monday, "facility_aware", "tue-06:30@School", "run", "done", 60),
+        r(w2, "time_only", "mon-16:15@School", "swim", "done", 60),
+        r(w2, "time_only", "tue-06:30@School", "run", "skipped", 0),
+    ]
+    text = weekly_report(rows)
+    assert "### By week type" in text and "### By slot" in text and "### By discipline" in text
+    assert "| facility_aware | 2.0h | 2.0h | 100% | 2/2 |" in text
+    assert "| time_only | 2.0h | 1.0h | 50% | 2/2 |" in text
+    assert "| tue-06:30@School | 2.0h | 1.0h | 50% | 2/2 |" in text
+    assert "| swim | 2.0h | 2.0h | 100% | 2/2 |" in text
+    assert "+50 pts" in text and "facility-awareness is helping" in text
+    assert completion_by(rows, "discipline") == {"swim": 1.0, "run": 0.5}
