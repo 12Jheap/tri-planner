@@ -1,0 +1,70 @@
+# Joe's real-world constraints. Edit times/dates to match reality — the planner
+# is only as good as this file. Holiday/exam dates below are placeholders.
+athlete: Joe
+race: sprint
+race_date: 2027-06-27
+
+locations:
+  - name: School
+    facilities:
+      - wattbike
+      - treadmill
+      - gym
+      - name: pool            # 25m pool, no morning access
+        windows:
+          - {days: [mon, tue, wed, thu, fri], start: "16:00", end: "19:00"}
+  - name: Home                # Hadlow Down
+    facilities:
+      - road_bike
+      - outdoor_run
+      - name: pool            # public pool 15-20 km away (ride there = bike volume)
+        windows:
+          - {days: [sat, sun], start: "08:00", end: "12:00"}
+          - {days: [mon, tue, wed, thu, fri], start: "07:00", end: "20:00"}
+  - name: Canterbury          # alternate weekends: run only
+    facilities:
+      - outdoor_run
+
+templates:
+  term:
+    slots:
+      - {day: mon, start: "06:30", end: "07:30", location: School}
+      - {day: mon, start: "16:15", end: "18:15", location: School}
+      - {day: tue, start: "06:30", end: "07:30", location: School}
+      - {day: tue, start: "16:15", end: "18:15", location: School}
+      - {day: wed, start: "06:30", end: "07:30", location: School}
+      - {day: wed, start: "14:00", end: "17:00", location: School}
+      - {day: thu, start: "06:30", end: "07:30", location: School}
+      - {day: thu, start: "16:15", end: "18:15", location: School}
+      - {day: fri, start: "06:30", end: "07:30", location: School}
+      - {day: fri, start: "16:15", end: "18:15", location: School}
+      - {day: sat, start: "08:00", end: "11:00", location: Home}
+      - {day: sun, start: "09:00", end: "12:00", location: Home}
+  term_canterbury:           # use as an override on Canterbury weekends
+    slots:
+      - {day: sat, start: "09:00", end: "10:30", location: Canterbury}
+      - {day: sun, start: "09:00", end: "10:30", location: Canterbury}
+  holiday:
+    slots:
+      - {day: mon, start: "08:00", end: "10:30", location: Home}
+      - {day: mon, start: "16:00", end: "18:00", location: Home}
+      - {day: tue, start: "08:00", end: "10:30", location: Home}
+      - {day: tue, start: "16:00", end: "18:00", location: Home}
+      - {day: wed, start: "08:00", end: "10:30", location: Home}
+      - {day: thu, start: "08:00", end: "10:30", location: Home}
+      - {day: thu, start: "16:00", end: "18:00", location: Home}
+      - {day: fri, start: "08:00", end: "10:30", location: Home}
+      - {day: sat, start: "08:00", end: "12:00", location: Home}
+      - {day: sun, start: "08:00", end: "12:00", location: Home}
+  exams:
+    slots:
+      - {day: mon, start: "17:00", end: "18:00", location: Home}
+      - {day: wed, start: "17:00", end: "18:00", location: Home}
+      - {day: sat, start: "09:00", end: "10:30", location: Home}
+
+default_template: term
+
+overrides:
+  - {name: Canterbury weekend, start: 2026-11-07, end: 2026-11-08, template: term_canterbury}
+  - {name: Christmas holiday, start: 2026-12-12, end: 2027-01-05, template: holiday}
+  - {name: Summer exams, start: 2027-05-10, end: 2027-06-18, template: exams}
