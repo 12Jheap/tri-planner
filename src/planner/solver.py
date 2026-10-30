@@ -255,9 +255,9 @@ def _solve(
     for (_sid, uid), var in x.items():
         per_day[by_uid[uid].on].append(var)
     stack_cost = round(SCALE * stacking_penalty)
-    for d, vars_ in per_day.items():
+    for day_key, vars_ in per_day.items():
         if len(vars_) > 1 and stack_cost:
-            extra = m.NewIntVar(0, len(vars_), f"extra[{d}]")
+            extra = m.NewIntVar(0, len(vars_), f"extra[{day_key}]")
             m.Add(extra >= sum(vars_) - 1)
             terms.append(-stack_cost * extra)
     m.Maximize(sum(terms))

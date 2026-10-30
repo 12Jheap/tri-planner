@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from planner.adherence import AdherenceModel, LogRow, read_log, weekly_summaries, write_log
@@ -21,6 +21,11 @@ from planner.sessions import build_week_sessions
 from planner.solver import Plan, plan_week
 from planner.store import PlanStore
 from planner.targets import weekly_targets
+
+
+def _local_now() -> datetime:
+    """Local wall-clock time; plans are in the athlete's local time."""
+    return datetime.now(UTC).astimezone().replace(tzinfo=None)
 
 
 def _load_log(path: Path) -> list[LogRow]:
@@ -144,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def common(p: argparse.ArgumentParser) -> None:
         p.add_argument("config", help="athlete YAML config")
-        p.add_argument("--week", type=date.fromisoformat, default=date.today() + timedelta(days=7))
+        p.add_argument("--week", type=date.fromisoformat, default=_local_now().date() + timedelta(days=7))
         p.add_argument("--out", default="out")
         p.add_argument("--prior-alpha", type=float, default=2.0)
         p.add_argument("--prior-beta", type=float, default=2.0)
@@ -160,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
 
     r = sub.add_parser("replan", help="re-plan the rest of a week")
     common(r)
-    r.add_argument("--now", type=datetime.fromisoformat, default=datetime.now())
+    r.add_argument("--now", type=datetime.fromisoformat, default=_local_now())
     r.add_argument("--injury", action="append", default=[], help="discipline:until, e.g. run:2026-11-10")
     r.add_argument("--unavailable", action="append", default=[], help="slot uid that's no longer possible")
     r.add_argument("--flag", action="append", default=[], help="session id you want moved")
