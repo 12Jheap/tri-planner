@@ -105,6 +105,7 @@ def plan_week(
     fixed: Mapping[str, str] | None = None,
     previous: Mapping[str, str] | None = None,
     churn_penalty: float = 0.3,
+    stacking_penalty: float = 0.25,
     default_p: float = DEFAULT_P,
     time_limit: float = 10.0,
 ) -> Plan:
@@ -113,6 +114,7 @@ def plan_week(
     p_complete: slot.key -> probability the athlete actually trains in that slot.
     fixed: session_id -> slot_uid that must not change (frozen sessions).
     previous: session_id -> slot_uid from the last plan; moving away costs `churn_penalty`.
+    stacking_penalty: cost of each session beyond the first on the same day (spreads load).
     """
     started = _time.perf_counter()
     p_complete = p_complete or {}
@@ -152,7 +154,7 @@ def plan_week(
     for _ in range(6):
         plan = _solve(
             sessions, slots, by_uid, offsets, p_complete, fixed, previous, churn_penalty,
-            default_p, time_limit, facility_aware, forbidden_pairs, config,
+            stacking_penalty, default_p, time_limit, facility_aware, forbidden_pairs, config,
         )
         if plan.status == "infeasible":
             break
@@ -173,6 +175,7 @@ def _solve(
     fixed: Mapping[str, str],
     previous: Mapping[str, str],
     churn_penalty: float,
+    stacking_penalty: float,
     default_p: float,
     time_limit: float,
     facility_aware: bool,
@@ -247,6 +250,16 @@ def _solve(
             stay = x.get((sid, uid))
             # Moving (or dropping) a previously placed session costs a fixed penalty.
             terms.append(move_penalty * stay if stay is not None else 0)
+    # Spread the load: every session beyond the first on a day costs a little.
+    per_day: dict[object, list[cp_model.IntVar]] = defaultdict(list)
+    for (_sid, uid), var in x.items():
+        per_day[by_uid[uid].on].append(var)
+    stack_cost = round(SCALE * stacking_penalty)
+    for d, vars_ in per_day.items():
+        if len(vars_) > 1 and stack_cost:
+            extra = m.NewIntVar(0, len(vars_), f"extra[{d}]")
+            m.Add(extra >= sum(vars_) - 1)
+            terms.append(-stack_cost * extra)
     m.Maximize(sum(terms))
     m.AddAssumptions(literals)
 

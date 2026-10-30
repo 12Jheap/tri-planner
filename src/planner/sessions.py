@@ -50,7 +50,8 @@ class Session(BaseModel):
     @property
     def label(self) -> str:
         tag = "KEY" if self.key else "flex"
-        return f"{self.discipline.title()} {self.kind.replace('_', ' ')} {self.duration_min}' [{tag}]"
+        kind = "" if self.kind == self.discipline else f" {self.kind.replace('_', ' ')}"
+        return f"{self.discipline.title()}{kind} {self.duration_min}' [{tag}]"
 
     def fits(self, location: Location, day: str, start: time, end: time) -> bool:
         """True if every facility requirement can be met at this place and time."""
