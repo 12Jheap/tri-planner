@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 from enum import Enum
+from itertools import pairwise
 from pathlib import Path
 from typing import Any, Literal
 
@@ -138,7 +139,7 @@ class WeekTemplate(BaseModel):
     def _no_overlaps(self) -> WeekTemplate:
         for day in DAYS:
             day_slots = sorted((s for s in self.slots if s.day == day), key=lambda s: s.start)
-            for a, b in zip(day_slots, day_slots[1:]):
+            for a, b in pairwise(day_slots):
                 if b.start < a.end:
                     raise ValueError(
                         f"overlapping slots on {day}: {a.start:%H:%M}-{a.end:%H:%M} "
