@@ -181,6 +181,13 @@ Half-iron races require athletes to be 18 on race day; the app says so where the
 - [ ] Planning any week targets the same volume the Season view shows for it (one shared rule); weeks planned far ahead say they assume you complete the weeks before, and a past week you didn't log holds volume flat instead of growing it
 - [ ] Half workouts differ from Olympic ones: race-effort blocks (76–83% FTP) in the long ride, a half-marathon-pace finish to the long run, longer CSS reps, long sweet-spot intervals and a brick that runs at half-marathon effort, with the same targets on the watch
 
+### US-021: Sessions fit short slots and the week spreads out
+**Description:** As a student with short school-day slots and long weekends, I want weekday slots used and the weekend not overloaded, so the plan is one I can recover from.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] A session too long for a slot can run there shortened, down to its sensible minimum (a Key session that fits nowhere at all is rescued shorter with a note); full length is used whenever it fits, and the shortened workout still adds up
+- [ ] On a timetable of short weekday slots and long weekends, weekday slots are used, quality sessions go midweek, the long ride and long run take different weekend days, and no weekend day carries two long sessions or more than its fair share plus the long session
+
 ### v1 — MVP web app (only if gates pass)
 
 ### US-007: 3-minute onboarding to week-1 preview

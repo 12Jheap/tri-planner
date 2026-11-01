@@ -32,6 +32,7 @@ STEP = 15  # minutes; granularity for fitting a session inside a facility window
 LONG_ROOM_BONUS = 0.15  # share of a long session's value for a slot it can fill
 QUALITY_SPACING = 0.35  # cost of quality sessions on the same or consecutive days
 LONG_HARD_CLASH = 1.0  # cost of a hard session on the same day as a long one
+DAY_OVER_COST = 0.008  # per minute a day goes beyond its fair share (day_cap)
 
 
 def slot_uid(slot: Slot) -> str:
@@ -146,6 +147,7 @@ def plan_week(
     default_p: float = DEFAULT_P,
     time_limit: float = 10.0,
     max_minutes: Mapping[str, int] | None = None,
+    day_cap: int | None = None,
 ) -> Plan:
     """Place `sessions` into dated `slots`.
 
@@ -154,6 +156,8 @@ def plan_week(
     previous: session_id -> slot_uid from the last plan; moving away costs `churn_penalty`.
     stacking_penalty: cost of each session beyond the first on the same day (spreads load).
     max_minutes: discipline -> most minutes to place this week (never below its Key sessions).
+    day_cap: minutes in one day above which each extra minute costs a little, so a week
+        spreads out instead of piling onto the weekend.
     """
     started = _time.perf_counter()
     sessions, fit_notes = fit_to_slots(sessions, slots, config, facility_aware)
@@ -163,9 +167,23 @@ def plan_week(
     by_uid = {slot_uid(k): k for k in slots}
 
     offsets: dict[tuple[str, str], int] = {}
+    sized: dict[tuple[str, str], Session] = {}  # a shorter version that fits this slot
     for s in sessions:
         for k in slots:
             off = _earliest_offset(s, k, config, facility_aware)
+            if off is None and s.min_min and s.min_min < s.duration_min:
+                # Too long for this slot: try it shorter, down to its sensible minimum
+                # (a 45-min sweet spot on a school morning beats moving it to Sunday).
+                top = min(s.duration_min - 5, k.minutes - k.minutes % 5)
+                for mins in range(top, s.min_min - 1, -5):
+                    trial = s.resized(mins)
+                    # A shorter version keeps more than its share of the value: 2 × 15 min
+                    # of sweet spot still does most of what 3 × 15 does.
+                    trial.value = round(s.value * (0.5 + 0.5 * mins / s.duration_min), 3)
+                    off = _earliest_offset(trial, k, config, facility_aware)
+                    if off is not None:
+                        sized[(s.id, slot_uid(k))] = trial
+                        break
             if off is not None:
                 offsets[(s.id, slot_uid(k))] = off
 
@@ -195,7 +213,7 @@ def plan_week(
         plan = _solve(
             sessions, slots, by_uid, offsets, p_complete, fixed, previous, churn_penalty,
             stacking_penalty, default_p, time_limit, facility_aware, forbidden_pairs, config,
-            max_minutes or {},
+            max_minutes or {}, sized, day_cap,
         )
         if plan.status == "infeasible":
             break
@@ -224,6 +242,8 @@ def _solve(
     forbidden_pairs: set[tuple[str, str, str]],
     config: AthleteConfig,
     max_minutes: Mapping[str, int],
+    sized: Mapping[tuple[str, str], Session],
+    day_cap: int | None,
 ) -> Plan:
     m = cp_model.CpModel()
     x = {pair: m.NewBoolVar(f"x[{pair[0]},{pair[1]}]") for pair in offsets}
@@ -239,9 +259,14 @@ def _solve(
     by_session: dict[str, list[cp_model.IntVar]] = defaultdict(list)
     by_slot: dict[str, list[tuple[Session, cp_model.IntVar]]] = defaultdict(list)
     sess = {s.id: s for s in sessions}
+
+    def version(sid: str, uid: str) -> Session:
+        """The session as it would run in this slot (full length unless it had to shrink)."""
+        return sized.get((sid, uid)) or sess[sid]
+
     for (sid, uid), var in x.items():
         by_session[sid].append(var)
-        by_slot[uid].append((sess[sid], var))
+        by_slot[uid].append((version(sid, uid), var))
 
     for s in sessions:
         vars_ = by_session.get(s.id, [])
@@ -259,7 +284,8 @@ def _solve(
     for uid, a, b in forbidden_pairs:
         m.Add(x[(a, uid)] + x[(b, uid)] <= 1)
     for disc, cap in max_minutes.items():
-        items = [(sess[sid], v) for (sid, _uid), v in x.items() if sess[sid].discipline == disc]
+        items = [(version(sid, u), v) for (sid, u), v in x.items()
+                 if sess[sid].discipline == disc]
         keys = sum(s.duration_min for s in sessions if s.discipline == disc and s.key)
         if items:
             m.Add(sum(s.duration_min * v for s, v in items) <= max(cap, keys))
@@ -293,7 +319,8 @@ def _solve(
     terms = []
     for (sid, uid), var in x.items():
         p = p_complete.get(by_uid[uid].key, default_p)
-        terms.append(round(SCALE * p * sess[sid].value) * var)
+        # A shortened version is worth less, so full length wins whenever it fits.
+        terms.append(round(SCALE * p * version(sid, uid).value) * var)
         s = sess[sid]
         if s.kind == "long":
             # Long sessions prefer the weekend, and slots with room to grow into.
@@ -360,6 +387,15 @@ def _solve(
             extra = m.NewIntVar(0, len(vars_), f"extra[{day_key}]")
             m.Add(extra >= sum(vars_) - 1)
             terms.append(-stack_cost * extra)
+    if day_cap:  # spread the load: minutes beyond a day's fair share cost a little each
+        for day in days:
+            items = [(version(sid, uid), v) for (sid, uid), v in x.items()
+                     if by_uid[uid].on == day]
+            if not items:
+                continue
+            over = m.NewIntVar(0, 24 * 60, f"over[{day}]")
+            m.Add(over >= sum(s.duration_min * v for s, v in items) - day_cap)
+            terms.append(-round(SCALE * DAY_OVER_COST) * over)
     m.Maximize(sum(terms))
     m.AddAssumptions(literals)
 

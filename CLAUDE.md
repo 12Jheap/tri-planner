@@ -6,11 +6,11 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
 
 ## Context
 - `docs/design.md` — verdict, positioning, phase plan with go/kill gates
-- `docs/prd.md` — user stories (v0 = US-001..006, US-014..020; v1 hosted app = US-007..013)
-- `docs/acceptance-contract.md` — AC-001..AC-093; AC-001..027 and AC-055..093 verified
+- `docs/prd.md` — user stories (v0 = US-001..006, US-014..021; v1 hosted app = US-007..013)
+- `docs/acceptance-contract.md` — AC-001..AC-095; AC-001..027 and AC-055..095 verified
   (US-014 usability, US-015 web app, US-016 sessions, US-017 import/season/move,
   US-018 strength opt-out, auto-sync, recovery check, Garmin HR, effort check, US-019 half,
-  US-020 season = plan volume, race-specific half workouts)
+  US-020 season = plan volume, race-specific half workouts, US-021 short slots + spread week)
 - `docs/competitor-research.md` — competitor matrix and sources
 
 ## Scope rules
@@ -40,7 +40,8 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
 - Garmin's JSON field names aren't documented to us: read them defensively (`wellness.find`),
   treat missing as "not available", and never change the plan without the athlete confirming.
 - Every test is named `test_ac_NNN_...` and maps to a criterion in the contract. Keep that mapping.
-- Example athlete config: `examples/joe.yaml` (holiday/exam dates are placeholders)
+- Example athlete config: `examples/joe.yaml` (holiday/exam dates are placeholders);
+  Joe's real term timetable is `tests/fixtures/short_weekday_slots.yaml`: check plan changes on it.
 
 ## Commands
 ```bash

@@ -702,6 +702,22 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 - **Evidence:** `tests/test_us_020_season_agrees_and_half_specific.py::test_ac_093_half_workouts_are_built_for_the_half` (pytest, 1 Nov 2026)
 - **Verified-by:** pytest
 
+### US-021: Sessions fit short slots and the week spreads out (v0)
+
+#### AC-094: A session too long for a slot can run there shortened, down to its sensible minimum (a Key session that fits nowhere at all is rescued shorter with a note); full length is used whenever it fits, and the shortened workout still adds up
+- **Method:** unit-test
+- **Test:** `tests/test_us_021_spread_the_week.py` > test_ac_094_sessions_shrink_to_fit_a_short_slot_but_not_below_their_minimum
+- **Status:** verified
+- **Evidence:** `tests/test_us_021_spread_the_week.py::test_ac_094_sessions_shrink_to_fit_a_short_slot_but_not_below_their_minimum` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-095: On a timetable of short weekday slots and long weekends, weekday slots are used, quality sessions go midweek, the long ride and long run take different weekend days, and no weekend day carries two long sessions or more than its fair share plus the long session
+- **Method:** e2e-test
+- **Test:** `tests/test_us_021_spread_the_week.py` > test_ac_095_a_school_week_spreads_out_instead_of_piling_onto_the_weekend
+- **Status:** verified
+- **Evidence:** `tests/test_us_021_spread_the_week.py::test_ac_095_a_school_week_spreads_out_instead_of_piling_onto_the_weekend` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
 ## Verification Summary
 | ID | Criterion | Method | Status | Evidence |
 |----|-----------|--------|--------|----------|
@@ -798,7 +814,9 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 | AC-091 | A half week on a school timetable uses double days when it n… | e2e-test | verified | test_us_019_half_distance.py |
 | AC-092 | Planning any week targets the same volume the Season view sh… | e2e-test | verified | test_us_020_season_agrees_and_half_specific.py |
 | AC-093 | Half workouts differ from Olympic ones: race-effort blocks (… | unit-test | verified | test_us_020_season_agrees_and_half_specific.py |
+| AC-094 | A session too long for a slot can run there shortened, down … | unit-test | verified | test_us_021_spread_the_week.py |
+| AC-095 | On a timetable of short weekday slots and long weekends, wee… | e2e-test | verified | test_us_021_spread_the_week.py |
 
-Progress: 66/93 verified — v0 (AC-001–AC-027, AC-055–AC-093) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+Progress: 68/95 verified — v0 (AC-001–AC-027, AC-055–AC-095) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
 
 GitHub issue: not created — no repository linked to this session.

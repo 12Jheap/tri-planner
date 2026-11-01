@@ -278,13 +278,19 @@ class Workspace:
         # Half distance needs more sessions than days, so two-session days are normal
         # (still never two of the same sport): the cost of stacking a day is lower.
         stacking = 0.1 if cfg.race == "half" else 0.25
+        # A day's fair share: 1.6× the average training day. Beyond it each minute costs a
+        # little, so the week spreads out instead of piling onto the weekend.
+        train_days = len({k.on for k in slots}) or 1
+        day_cap = max(60, round(1.6 * sum(targets.values()) / train_days))
         plan = plan_week(sessions, slots, cfg, model.probabilities(), facility_aware=aware,
-                         default_p=model.p("unseen"), stacking_penalty=stacking)
+                         default_p=model.p("unseen"), stacking_penalty=stacking,
+                         day_cap=day_cap)
         if plan.status == "infeasible" and any(x.key for x in sessions):
             # A busy week (exams, travel): keep the sessions that fit rather than fail.
             relaxed = [x.model_copy(update={"key": False}) for x in sessions]
             plan = plan_week(relaxed, slots, cfg, model.probabilities(), facility_aware=aware,
-                             default_p=model.p("unseen"), stacking_penalty=stacking)
+                             default_p=model.p("unseen"), stacking_penalty=stacking,
+                             day_cap=day_cap)
             if plan.status != "infeasible":
                 kept = sum(1 for p in plan.placements if p.session.id in
                            {x.id for x in sessions if x.key})

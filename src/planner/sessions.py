@@ -224,18 +224,18 @@ HALF_MENU: dict[str, list[Spec]] = {
     "base": [
         ("swim", "technique", 2, True, 50, 35), ("swim", "css", 3, True, 55, 40),
         ("swim", "endurance", 2, False, 50, 35),
-        ("bike", "long", 2, True, 150, 90), ("bike", "tempo", 3, True, 75, 60),
+        ("bike", "long", 2, True, 150, 90), ("bike", "tempo", 3, True, 75, 45),
         ("bike", "endurance", 2, False, 75, 45), ("bike", "endurance", 2, False, 60, 40),
-        ("run", "long", 2, True, 90, 60), ("run", "tempo", 3, True, 50, 40),
+        ("run", "long", 2, True, 90, 60), ("run", "tempo", 3, True, 50, 35),
         ("run", "easy_strides", 2, False, 45, 30), ("run", "easy", 1, False, 40, 25),
     ],
     "build": [
         ("swim", "css", 4, True, 55, 40), ("swim", "endurance", 2, False, 50, 35),
         ("swim", "technique", 2, False, 40, 30),  # 3 swims beat 2 long ones
-        ("bike", "long", 2, True, 210, 120), ("bike", "tempo", 3, True, 90, 60),
+        ("bike", "long", 2, True, 210, 120), ("bike", "tempo", 3, True, 90, 45),
         ("bike", "brick", 3, True, 120, 75), ("bike", "threshold", 4, False, 75, 50),
         ("bike", "endurance", 2, False, 60, 40),
-        ("run", "long", 2, True, 105, 70), ("run", "tempo", 3, True, 60, 40),
+        ("run", "long", 2, True, 105, 70), ("run", "tempo", 3, True, 60, 35),
         ("run", "threshold", 4, False, 50, 35), ("run", "easy_strides", 2, False, 45, 30),
         # 4 runs max: extra run volume goes into longer easy runs, not a 5th run.
     ],
