@@ -124,6 +124,8 @@ Two stages:
 - [ ] "Something's changed" re-plans from ticked slots, a new or cleared injury and flagged sessions, and shows a receipt for every move
 - [ ] Every form needs the page's secret token, so another website open in your browser can't change your plan or log
 
+- [ ] With no settings file or a broken one (and the real clock, as on a fresh install), every page reaches Setup in one redirect and says what's wrong; no page ever redirects to itself
+
 ### US-016: Personalised sessions planned into your availability
 **Description:** As an athlete, I want to say when I'm free and how fit I am now, and get real sessions (tempo, threshold, CSS, bricks) with my own paces, watts and heart rates, fitted into those slots, so the plan feels like it was written for me.
 **Agent:** Advocate

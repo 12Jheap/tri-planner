@@ -117,15 +117,19 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
     def clock() -> datetime:
         return now() if now else ws.now()
 
-    def configured() -> bool:
+    def config_problem() -> str | None:
+        """None if the config loads, otherwise what's wrong with it."""
         if not ws.config_path.exists():
-            return False
+            return "missing"
         try:
             ws.reload()
             _ = ws.cfg
-            return True
-        except ConfigError:
-            return False
+            return None
+        except ConfigError as err:
+            return str(err)
+
+    def configured() -> bool:
+        return config_problem() is None
 
     @app.context_processor
     def _globals() -> dict[str, Any]:
@@ -139,18 +143,26 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
     def _guard() -> Response | None:
         if request.method == "POST" and request.form.get("token") != token:
             abort(400, "This form is out of date. Reload the page and try again.")
-        if request.endpoint not in ("setup", "setup_save", "static") and not configured():
-            if ws.config_path.exists():
-                flash(f"{ws.config_path} has a problem: fix it here.", "error")
+        problem = None if request.endpoint in ("setup", "setup_save", "static") \
+            else config_problem()
+        if problem:
+            if problem != "missing":
+                flash(f"{ws.config_path.resolve()} has a problem: {problem}", "error")
                 return redirect(url_for("setup", raw=1))
             return redirect(url_for("setup"))
         return None
 
     @app.errorhandler(PlannerError)
     @app.errorhandler(ValueError)
-    def _planner_error(err: Exception) -> Response:
+    def _planner_error(err: Exception) -> Response | tuple[str, int]:
+        target = request.referrer or url_for("today")
+        if request.method == "GET" or target.rstrip("/") == request.url.rstrip("/"):
+            # Show the problem instead of redirecting: a page that errors and sends you
+            # back to itself would loop forever ("redirected too many times").
+            return render_template("error.html", message=str(err),
+                                   config=str(ws.config_path.resolve())), 400
         flash(str(err), "error")
-        return redirect(request.referrer or url_for("today"))
+        return redirect(target)
 
     # ---- helpers ----------------------------------------------------------------------
     def card(p: Placement, log: dict[str, LogRow], today: date) -> dict[str, Any]:

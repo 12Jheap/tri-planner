@@ -203,3 +203,19 @@ def test_ac_070_forms_only_accept_posts_from_the_app_itself(tmp_path):
 @pytest.fixture(autouse=True)
 def _no_browser(monkeypatch):
     monkeypatch.setattr("webbrowser.open", lambda *_a, **_k: None)
+
+
+@pytest.mark.parametrize("text", [None, "athlete: [oops", "athlete: Joe\nrace: half\n"])
+def test_ac_096_first_run_or_a_broken_settings_file_never_loops(tmp_path, text):
+    """AC-096 [e2e-test]: With no settings file or a broken one (and the real clock, as on a fresh install), every page reaches Setup in one redirect and says what's wrong; no page ever redirects to itself"""
+    cfg = tmp_path / "athlete.yaml"
+    if text is not None:
+        cfg.write_text(text)
+    client = create_app(Workspace(cfg, tmp_path / "out")).test_client()  # no fake clock
+    for url in ("/", "/week", "/season", "/progress", "/replan", "/setup"):
+        res = client.get(url, follow_redirects=True)
+        assert res.status_code == 200 and len(res.history) <= 1, url
+        page = res.get_data(as_text=True)
+        assert "Set up your week" in page or "Setup" in page or "Profile" in page
+        if text is not None and url != "/setup":
+            assert "has a problem:" in page and str(cfg.resolve()) in page

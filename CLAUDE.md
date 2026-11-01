@@ -7,7 +7,7 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
 ## Context
 - `docs/design.md` — verdict, positioning, phase plan with go/kill gates
 - `docs/prd.md` — user stories (v0 = US-001..006, US-014..021; v1 hosted app = US-007..013)
-- `docs/acceptance-contract.md` — AC-001..AC-095; AC-001..027 and AC-055..095 verified
+- `docs/acceptance-contract.md` — AC-001..AC-096; AC-001..027 and AC-055..096 verified
   (US-014 usability, US-015 web app, US-016 sessions, US-017 import/season/move,
   US-018 strength opt-out, auto-sync, recovery check, Garmin HR, effort check, US-019 half,
   US-020 season = plan volume, race-specific half workouts, US-021 short slots + spread week)
@@ -39,6 +39,8 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
   (tests/conftest.py hides any real key).
 - Garmin's JSON field names aren't documented to us: read them defensively (`wellness.find`),
   treat missing as "not available", and never change the plan without the athlete confirming.
+- Web tests that inject a fake clock skip `Workspace.now()`; keep at least one test per page
+  path on the real clock (AC-096 caught a first-run redirect loop that way).
 - Every test is named `test_ac_NNN_...` and maps to a criterion in the contract. Keep that mapping.
 - Example athlete config: `examples/joe.yaml` (holiday/exam dates are placeholders);
   Joe's real term timetable is `tests/fixtures/short_weekday_slots.yaml`: check plan changes on it.

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Something needs fixing · tri-planner{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+<div class="head"><div><div class="eyebrow">Something needs fixing</div><h1>That didn't work</h1></div></div>
+<div class="msg error">{{ message }}</div>
+<p class="muted" style="max-width:64ch">Settings file in use: <code>{{ config }}</code></p>
+<div class="row" style="margin-top:12px">
+  <a class="btn primary" href="{{ url_for('setup', raw=1) }}">Open settings</a>
+  <a class="btn" href="{{ url_for('today') }}">Today</a>
+</div>
+{% endblock %}

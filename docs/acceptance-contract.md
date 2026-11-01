@@ -531,6 +531,13 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 - **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_070_forms_only_accept_posts_from_the_app_itself` (pytest, 1 Nov 2026)
 - **Verified-by:** pytest
 
+#### AC-096: With no settings file or a broken one (and the real clock, as on a fresh install), every page reaches Setup in one redirect and says what's wrong; no page ever redirects to itself
+- **Method:** e2e-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_096_first_run_or_a_broken_settings_file_never_loops
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_096_first_run_or_a_broken_settings_file_never_loops` (pytest, 1 Nov 2026; regression for a redirect loop found on a fresh Windows install)
+- **Verified-by:** pytest
+
 ### US-016: Personalised sessions planned into your availability (v0)
 
 #### AC-071: A 5k time, swim CSS (or 400m + 200m time trials), FTP and threshold or max HR give personal run pace, swim pace, bike power and HR zones that don't overlap; missing numbers fall back to effort; impossible numbers are rejected
@@ -816,7 +823,8 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 | AC-093 | Half workouts differ from Olympic ones: race-effort blocks (… | unit-test | verified | test_us_020_season_agrees_and_half_specific.py |
 | AC-094 | A session too long for a slot can run there shortened, down … | unit-test | verified | test_us_021_spread_the_week.py |
 | AC-095 | On a timetable of short weekday slots and long weekends, wee… | e2e-test | verified | test_us_021_spread_the_week.py |
+| AC-096 | With no settings file or a broken one (and the real clock, a… | e2e-test | verified | test_us_015_local_web_app.py |
 
-Progress: 68/95 verified — v0 (AC-001–AC-027, AC-055–AC-095) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+Progress: 69/96 verified — v0 (AC-001–AC-027, AC-055–AC-096) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
 
 GitHub issue: not created — no repository linked to this session.

@@ -35,7 +35,14 @@ from planner.adherence import (
     weekly_summaries,
     write_log,
 )
-from planner.config import AthleteConfig, Slot, calendar_for_week, load_config, week_start
+from planner.config import (
+    AthleteConfig,
+    ConfigError,
+    Slot,
+    calendar_for_week,
+    load_config,
+    week_start,
+)
 from planner.export import export_week
 from planner.friendly import resolve_slots
 from planner.garmin import Fetcher, GarminError, Getter, fetch_activities, get_json
@@ -164,8 +171,16 @@ class Workspace:
         self._cfg = None
 
     def now(self) -> datetime:
-        """Wall-clock time where the athlete lives; plans are in local time."""
-        return datetime.now(ZoneInfo(self.cfg.timezone)).replace(tzinfo=None)
+        """Wall-clock time where the athlete lives; plans are in local time.
+
+        Works even before there's a valid config (first run, or a broken file), so the
+        setup page that fixes it can always load.
+        """
+        try:
+            tz = self.cfg.timezone
+        except (ConfigError, OSError):
+            tz = "Europe/London"
+        return datetime.now(ZoneInfo(tz)).replace(tzinfo=None)
 
     @property
     def log_path(self) -> Path:
