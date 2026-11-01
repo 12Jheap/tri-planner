@@ -29,6 +29,7 @@ LOW_RESPONSE = 0.70
 LOG_COLUMNS = [
     "on", "week", "session_id", "discipline", "slot_key", "planned_min",
     "status", "reason", "actual_min", "pain", "source", "week_type",
+    "avg_hr", "avg_power", "distance_m", "activity_id",
 ]
 
 
@@ -45,6 +46,21 @@ class LogRow(BaseModel):
     pain: bool = False
     source: Source = "manual"
     week_type: str = "facility_aware"
+    # Filled in when the session came from a watch file (all optional).
+    avg_hr: int | None = None
+    avg_power: int | None = None
+    distance_m: int | None = None
+    activity_id: str = ""
+
+    @field_validator("avg_hr", "avg_power", "distance_m", mode="before")
+    @classmethod
+    def _blank_metric(cls, v: object) -> object:
+        return None if v in (None, "") else v
+
+    @field_validator("activity_id", mode="before")
+    @classmethod
+    def _blank_id(cls, v: object) -> object:
+        return "" if v is None else v
 
     @field_validator("status", mode="before")
     @classmethod
@@ -104,7 +120,7 @@ def write_log(path: str | Path, rows: Iterable[LogRow], append: bool = False) ->
             d = r.model_dump(mode="json")
             d["status"] = "" if r.status == "no_response" else r.status
             d["pain"] = "yes" if r.pain else ""
-            w.writerow(d)
+            w.writerow({k: "" if v is None else v for k, v in d.items()})
     return out
 
 

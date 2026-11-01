@@ -93,8 +93,8 @@ p { margin: 6px 0; }
   .tabs { position: fixed; left: 0; right: 0; bottom: 0; height: auto; gap: 0;
           background: var(--surface); border-top: 1px solid var(--line);
           padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); justify-content: space-around; }
-  .tabs a { flex-direction: column; gap: 3px; font-size: 11px; border: 0; margin: 0;
-            padding: 4px 10px; }
+  .tabs a { flex-direction: column; gap: 3px; font-size: 10.5px; border: 0; margin: 0;
+            padding: 4px 4px; }
   .tabs a.on { color: var(--ink); }
   .tabs svg { display: block; }
 }
@@ -310,3 +310,55 @@ table.data td.feel { color: var(--muted); }
 .two { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; align-items: start; }
 @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
 .aside { position: sticky; top: 76px; }
+
+/* ---------- season ---------- */
+.season { border-top: 1px solid var(--line); margin-top: 8px; }
+.sw { display: grid; grid-template-columns: 64px 128px minmax(120px, 1fr) 120px 170px; gap: 14px;
+      align-items: center; padding: 7px 0 7px 10px; border-bottom: 1px solid var(--line);
+      text-decoration: none; border-left: 3px solid var(--line); font-size: 13.5px; }
+.sw:hover { background: var(--surface); }
+.sw.ph-base { border-left-color: var(--z-easy); }
+.sw.ph-build { border-left-color: var(--z-threshold); }
+.sw.ph-taper { border-left-color: var(--z-vo2); }
+.sw.recovery { border-left-color: var(--z-recovery); }
+.sw.race { border-left-color: var(--ink); font-weight: 650; }
+.sw.past { color: var(--muted); }
+.sw.now { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-2); }
+.sw.now .sw-date { font-weight: 700; color: var(--ink); }
+.sw-phase { white-space: nowrap; }
+.sw-num { text-align: right; white-space: nowrap; }
+.sw-note { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis;
+           white-space: nowrap; }
+.sw-bars { position: relative; height: 16px; }
+.sw-bars .bar { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+.sw-bars .free { background: transparent; border: 1px dashed var(--line-2); }
+.sw-bars .projected { background: var(--line); top: 4px; bottom: 4px; }
+.sw-bars .planned { background: transparent; border: 1.5px solid var(--ink-2); top: 2px;
+                    bottom: 2px; }
+.sw-bars .done { background: var(--ink); top: 5px; bottom: 5px; }
+.season-key { width: 14px !important; height: 8px !important; border-radius: 2px; }
+.season-key.projected { background: var(--line); }
+.season-key.planned { border: 1.5px solid var(--ink-2); }
+.season-key.done { background: var(--ink); }
+.season-key.free { border: 1px dashed var(--line-2); }
+@media (max-width: 720px) {
+  .sw { grid-template-columns: 52px 1fr 76px; gap: 10px; }
+  .sw-bars { grid-column: 1 / -1; order: 5; }
+  .sw-note { display: none; }
+  .sw-phase { font-size: 13px; }
+}
+
+/* ---------- import / move ---------- */
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 12px 0 4px; }
+.toolbar form { display: inline-flex; gap: 8px; align-items: center; margin: 0; }
+.filepick { position: relative; overflow: hidden; }
+.filepick input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.moves { display: grid; gap: 4px; }
+.moves .day-row { grid-template-columns: 110px 1fr; }
+.moves .opt { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.moves .warn { color: var(--bad); font-size: 12.5px; }
+.badge-test { display: inline-block; font-size: 11px; font-weight: 650; text-transform: uppercase;
+              letter-spacing: .06em; border: 1px solid var(--z-tempo); color: var(--ink-2);
+              border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px; }
+.moves .day-row .d { padding-top: 4px; }
+.moves .day-row { padding: 8px 0; }

@@ -17,6 +17,26 @@
 
 {% for b in banners %}<div class="msg">{{ b }}</div>{% endfor %}
 
+{% if plan %}
+<div class="toolbar">
+  {% if garmin_ready %}
+  <form method="post" action="{{ url_for('sync') }}">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="next" value="{{ url_for('today', d=day) }}">
+    <button class="primary">Sync from Garmin</button>
+  </form>
+  {% endif %}
+  <form method="post" action="{{ url_for('import_files') }}" enctype="multipart/form-data" id="upload">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="next" value="{{ url_for('today', d=day) }}">
+    <label class="btn filepick">Add activity files
+      <input type="file" name="files" accept=".fit,.zip" multiple onchange="this.form.submit()">
+    </label>
+  </form>
+  {% if not garmin_ready %}<a class="small muted" href="{{ url_for('setup') }}#garmin">Connect Garmin</a>{% endif %}
+</div>
+{% endif %}
+
 {% if summary %}
   <div class="small muted tnum">This week: {{ fmt_min(summary.completed_min) }} of {{ fmt_min(summary.planned_min) }} done · {{ summary.logged }} of {{ summary.sessions }} logged</div>
   <div class="meter"><i style="width: {{ [summary.ratio * 100, 100]|min }}%"></i></div>

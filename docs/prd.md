@@ -135,6 +135,20 @@ Two stages:
 - [ ] Across a real season: no hard session on the same day as a long one, long ride and long run on different days, nothing on race day, and a packed exam week keeps its most valuable sessions instead of failing
 - [ ] The profile page asks for current fitness and shows your zones; each session page shows why, a zone timeline and every step with your targets; the interface uses no emoji
 
+### US-017: Less logging, season view, moving sessions, the experiment
+**Description:** As an athlete, I want my watch to do the logging, to see the whole season to race day, to move a session myself when I know better, and to run the facility-aware experiment from the website, so the 6-week test actually happens.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] The experiment is switched on from the Profile page: weeks then alternate facility-aware / time-only, test weeks are labelled, and the season shows which is which
+- [ ] The season view lists every week to race day with its phase, recovery weeks, holidays and exams, what was planned and done, and the volume the planner is heading for (≤10%/week growth, a ceiling for the distance, never more than free time)
+- [ ] You can move a session to any later slot where its kit is open and there's room; the plan, log and files follow, a logged session can't be moved, and breaking a coaching rule is allowed but flagged
+- [ ] Activity files (.fit, a .zip export, or a folder) tick off the matching planned session: same sport and week, same day = done, other day = moved; a brick's run leg is merged; extras are reported, not forced in; nothing is imported twice and sessions you logged yourself are left alone
+- [ ] "Sync from Garmin" uses Garmin's Personal API client with your key from ~/.config/garmin or GARMIN_PERSONAL_API_KEY, downloads recent activities' original files and ticks off sessions; no key or a refused key gives a plain message; the key is stored readable only by you and never in the project
+- [ ] On Today you can sync from Garmin or add activity files; imported sessions show time, distance and heart rate, and you can still say something hurt
+
+Note: this uses Garmin's **Personal API** (one athlete's own data, pulled with a personal
+key), which fits v0. US-013's push integration via the Training/Health APIs stays v1.
+
 ### v1 — MVP web app (only if gates pass)
 
 ### US-007: 3-minute onboarding to week-1 preview

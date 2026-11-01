@@ -181,6 +181,11 @@ class AthleteConfig(BaseModel):
     weekly_hours: float | None = None  # older name for profile.current_hours
     timezone: str = "Europe/London"
     profile: Profile = Profile()
+    # Alternate facility-aware and time-only weeks from this Monday (the experiment).
+    experiment_start: date | None = None
+    # Optional: the watch's activity folder when it's plugged in, e.g.
+    # /Volumes/GARMIN/GARMIN/Activity (Mac) or E:\GARMIN\Activity (Windows).
+    watch_folder: str | None = None
     locations: list[Location]
     templates: dict[str, WeekTemplate]
     default_template: str

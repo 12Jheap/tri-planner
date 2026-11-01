@@ -11,6 +11,33 @@
   <a class="btn" href="{{ url_for('week_view', w=week) }}">Week</a>
 </div>
 {{ full(c, url_for('session_detail', week=week, sid=c.s.id), detail=True) }}
+{% if move_days %}
+  <details class="card" style="padding:16px 20px" {{ 'open' if request.args.get('move') }}>
+    <summary style="cursor:pointer;font-weight:600">Move this session</summary>
+    <p class="small muted" style="margin-top:8px">Slots where the kit is open and there's room. You can break a coaching rule if you need to; you'll be told.</p>
+    <form method="post" action="{{ url_for('move') }}" class="moves">
+      <input type="hidden" name="token" value="{{ token }}">
+      <input type="hidden" name="week" value="{{ week }}">
+      <input type="hidden" name="session" value="{{ c.s.id }}">
+      {% for day, opts in move_days.items() %}
+        <div class="day-row">
+          <div class="d">{{ day.strftime('%a %d') }}</div>
+          <div>
+            {% for o in opts %}
+              <label class="check opt"><input type="radio" name="slot" value="{{ o.uid }}" required>
+                <span class="tnum">{{ o.start.strftime('%H:%M') }}</span> <span class="muted">{{ o.slot.location }}</span>
+                {% for w in o.warnings %}<span class="warn">{{ w }}</span>{% endfor %}
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+      <div><button class="primary">Move</button></div>
+    </form>
+  </details>
+{% elif not c.row %}
+  <p class="small muted">No other slot this week can take this session (kit, opening hours or room).</p>
+{% endif %}
 {% if c.s.discipline in ('run', 'bike', 'swim') and c.s.discipline not in known and not ('hr' in known and c.s.discipline != 'swim') %}
   <p class="small muted">Targets are by feel because there are no {{ {'run': '5k', 'bike': 'FTP or heart-rate', 'swim': 'CSS'}[c.s.discipline] }} numbers yet.
     <a href="{{ url_for('setup') }}#fitness">Add them</a> for paces and zones.</p>

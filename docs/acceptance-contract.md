@@ -575,6 +575,50 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 - **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_076_profile_and_session_pages_show_personal_targets_without_emoji` (pytest, 1 Nov 2026)
 - **Verified-by:** pytest
 
+### US-017: Less logging, season view, moving sessions, the experiment (v0)
+
+#### AC-077: The experiment is switched on from the Profile page: weeks then alternate facility-aware / time-only, test weeks are labelled, and the season shows which is which
+- **Method:** e2e-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_077_experiment_is_switched_on_from_the_website
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_077_experiment_is_switched_on_from_the_website` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-078: The season view lists every week to race day with its phase, recovery weeks, holidays and exams, what was planned and done, and the volume the planner is heading for (≤10%/week growth, a ceiling for the distance, never more than free time)
+- **Method:** e2e-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_078_season_view_shows_the_road_to_race_day
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_078_season_view_shows_the_road_to_race_day` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-079: You can move a session to any later slot where its kit is open and there's room; the plan, log and files follow, a logged session can't be moved, and breaking a coaching rule is allowed but flagged
+- **Method:** e2e-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_079_move_a_session_yourself_within_the_rules
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_079_move_a_session_yourself_within_the_rules` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-080: Activity files (.fit, a .zip export, or a folder) tick off the matching planned session: same sport and week, same day = done, other day = moved; a brick's run leg is merged; extras are reported, not forced in; nothing is imported twice and sessions you logged yourself are left alone
+- **Method:** integration-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_080_watch_files_tick_off_the_right_sessions_once
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_080_watch_files_tick_off_the_right_sessions_once` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-081: "Sync from Garmin" uses Garmin's Personal API client with your key from ~/.config/garmin or GARMIN_PERSONAL_API_KEY, downloads recent activities' original files and ticks off sessions; no key or a refused key gives a plain message; the key is stored readable only by you and never in the project
+- **Method:** integration-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_081_garmin_personal_api_sync
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_081_garmin_personal_api_sync` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-082: On Today you can sync from Garmin or add activity files; imported sessions show time, distance and heart rate, and you can still say something hurt
+- **Method:** e2e-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_082_import_from_the_website_and_still_report_pain
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_082_import_from_the_website_and_still_report_pain` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
 ## Verification Summary
 | ID | Criterion | Method | Status | Evidence |
 |----|-----------|--------|--------|----------|
@@ -654,7 +698,13 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 | AC-074 | Sessions are fitted into your free slots and aerobic session… | unit-test | verified | test_us_016_personalised_training.py |
 | AC-075 | Across a real season: no hard session on the same day as a l… | e2e-test | verified | test_us_016_personalised_training.py |
 | AC-076 | The profile page asks for current fitness and shows your zon… | e2e-test | verified | test_us_016_personalised_training.py |
+| AC-077 | The experiment is switched on from the Profile page: weeks t… | e2e-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-078 | The season view lists every week to race day with its phase,… | e2e-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-079 | You can move a session to any later slot where its kit is op… | e2e-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-080 | Activity files (.fit, a .zip export, or a folder) tick off t… | integration-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-081 | "Sync from Garmin" uses Garmin's Personal API client with yo… | integration-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-082 | On Today you can sync from Garmin or add activity files; imp… | e2e-test | verified | test_us_017_less_logging_season_and_control.py |
 
-Progress: 49/76 verified — v0 (AC-001–AC-027, AC-055–AC-076) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+Progress: 55/82 verified — v0 (AC-001–AC-027, AC-055–AC-082) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
 
 GitHub issue: not created — no repository linked to this session.

@@ -150,8 +150,47 @@
     {% if form.templates %}<button type="button" class="quiet" onclick="addOverride()" style="padding-left:0">+ Add dates</button>{% endif %}
   </fieldset>
 
+  <h2>Watch and experiment</h2>
+  <fieldset>
+    <legend>Watch folder</legend>
+    <p class="lead">Optional. Where the watch's activity files appear when it's plugged in by USB, so Today can read them with one tap.</p>
+    <label>Folder
+      <input type="text" name="watch_folder" value="{{ watch_folder }}" placeholder="/Volumes/GARMIN/GARMIN/Activity  or  E:\GARMIN\Activity">
+    </label>
+  </fieldset>
+
+  <fieldset id="experiment">
+    <legend>The experiment</legend>
+    <p class="lead">Does planning around your kit and places actually help? From the start date, weeks alternate: a normal week, then a time-only test week that ignores facilities (like most apps). Progress compares how much you complete in each. You need about 6 weeks to see a difference.</p>
+    <label class="check"><input type="checkbox" name="experiment" value="1" {{ 'checked' if experiment }}> Run the experiment</label>
+    <label style="max-width:240px;margin-top:8px">Starting Monday
+      <input type="date" name="experiment_start" value="{{ experiment or next_monday.isoformat() }}" step="7">
+    </label>
+  </fieldset>
+
   <div class="save-bar"><button class="primary">Save</button><span class="small muted">Saved settings are checked before anything is written.</span></div>
 </form>
+
+<h2 id="garmin">Garmin Connect</h2>
+<fieldset>
+  <legend>Personal API</legend>
+  {% if not garmin_lib %}
+    <p class="lead">Garmin's client isn't installed. In the tri-planner folder run
+      <code>pip install -e ".[garmin]"</code> (needs Python 3.12 or newer), then restart <code>tri-plan web</code>.</p>
+  {% endif %}
+  {% if garmin_key %}
+    <p><b>Connected.</b> <span class="muted">"Sync from Garmin" on Today ticks off this week's sessions from your recorded activities.</span></p>
+  {% else %}
+    <p class="lead">Make a key at <a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Garmin Connect → Personal API</a> and paste it here. It's saved to <code>{{ key_file }}</code>, readable only by you, and never into this project.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('garmin_key') }}" class="row" style="align-items:flex-end;max-width:560px">
+    <input type="hidden" name="token" value="{{ token }}">
+    <label style="flex:1">{{ 'Replace key' if garmin_key else 'Personal API key' }}
+      <input type="password" name="key" autocomplete="off" spellcheck="false" required>
+    </label>
+    <button>{{ 'Replace' if garmin_key else 'Save key' }}</button>
+  </form>
+</fieldset>
 
 <details {{ 'open' if show_raw }} style="margin-top:28px">
   <summary class="btn">Settings file</summary>

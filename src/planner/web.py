@@ -31,15 +31,18 @@ from flask import (
 )
 from werkzeug.wrappers import Response
 
+from planner import garmin
+from planner.activities import ImportResult
 from planner.adherence import AdherenceModel, LogRow, weekly_summaries
 from planner.config import DAYS, ConfigError, Facility, parse_config, week_start
 from planner.friendly import parse_injury
+from planner.garmin import Fetcher
 from planner.profile import ZONE_NAMES, mmss
-from planner.report import completion_by
+from planner.report import completion_by, week_type
 from planner.service import PlannerError, Workspace, placements_on, slot_label
 from planner.sessions import how_to
 from planner.solver import Placement, slot_uid
-from planner.targets import DEFAULT_HOURS, is_recovery_week, phase_for
+from planner.targets import DEFAULT_HOURS, MAX_HOURS, is_recovery_week, phase_for
 from planner.wizard import FACILITY_NAMES, parse_windows, to_yaml
 from planner.workouts import workout_for
 
@@ -80,7 +83,8 @@ def _dur(seconds: int) -> str:
     return f"{seconds // 60}:{seconds % 60:02d}" if seconds % 60 else f"{seconds // 60} min"
 
 
-def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flask:
+def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
+               garmin_fetch: Fetcher | None = None) -> Flask:
     app = Flask(__name__, template_folder=str(HERE / "templates"),
                 static_folder=str(HERE / "static"))
     app.secret_key = secrets.token_hex(16)
@@ -104,7 +108,8 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
         return {
             "token": token, "how_to": how_to, "fmt_min": _fmt_min, "nice": _nice,
             "reasons": REASON_TEXT, "nav": request.endpoint, "zone_names": ZONE_NAMES,
-            "mmss": mmss, "dur": _dur,
+            "mmss": mmss, "dur": _dur, "garmin_ready": garmin_fetch is not None or (
+                garmin.library_installed() and garmin.key_available()),
         }
 
     @app.before_request
@@ -191,6 +196,9 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
             fits=len(list(wk_dir.glob("*.fit"))) if wk_dir.exists() else 0,
             hours=ws.cfg.profile.current_hours or DEFAULT_HOURS[ws.cfg.race], totals=totals,
             weeks_to_race=(race - week).days // 7 if race and race >= week else None,
+            test_week=(not plan.facility_aware) if plan
+            else week_type(week, ws.cfg.experiment_start) == "time_only",
+            experiment=ws.cfg.experiment_start,
         )
 
     @app.get("/s/<week>/<sid>")
@@ -202,8 +210,86 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
             abort(404)
         assert p is not None
         c = card(p, ws.log_index(wk), clock().date())
-        return render_template("session.html", c=c, week=wk,
-                               known=ws.cfg.profile.known)
+        moves = []
+        if not c["row"]:
+            try:
+                moves = ws.move_options(wk, sid, clock())
+            except PlannerError:
+                moves = []
+        by_day: dict[date, list[Any]] = defaultdict(list)
+        for o in moves:
+            assert o.slot.on is not None
+            by_day[o.slot.on].append(o)
+        return render_template("session.html", c=c, week=wk, known=ws.cfg.profile.known,
+                               move_days=dict(sorted(by_day.items())))
+
+    @app.post("/move")
+    def move() -> Response:
+        f = request.form
+        week = week_start(date.fromisoformat(f["week"]))
+        _plan, warnings = ws.move_session(week, f["session"], f["slot"], clock())
+        flash("Moved. Calendar and watch files are updated.", "ok")
+        for w in warnings:
+            flash(f"Heads up: {w} You can keep it, but it's harder to recover from.", "info")
+        return redirect(url_for("week_view", w=week))
+
+    @app.get("/season")
+    def season() -> str:
+        today_ = clock().date()
+        weeks = ws.season(today_)
+        top = max([max(w.projected_min, w.planned_min or 0, w.done_min or 0) for w in weeks]
+                  + [60])
+        return render_template("season.html", weeks=weeks, top=top, race=ws.cfg.race_date,
+                               experiment=ws.cfg.experiment_start,
+                               ceiling=MAX_HOURS[ws.cfg.race])
+
+    def _import_report(res: ImportResult, where: str) -> None:
+        if res.matched:
+            flash(f"{where}: ticked off {len(res.matched)} session"
+                  f"{'s' if len(res.matched) != 1 else ''}. If anything hurt, open the "
+                  "session and say so.", "ok")
+        elif not res.extras:
+            flash(f"{where}: nothing new to log.", "info")
+        if res.extras:
+            flash("Recorded but not in the plan: " + "; ".join(
+                a.describe() for a in res.extras[:5]) + ".", "info")
+        if res.unreadable:
+            flash("Couldn't read: " + ", ".join(res.unreadable) + ".", "error")
+
+    @app.post("/import")
+    def import_files() -> Response:
+        uploads = [(fs.filename or "upload", fs.read()) for fs in request.files.getlist("files")
+                   if fs.filename]
+        if not uploads:
+            raise PlannerError("Choose one or more .fit or .zip files first.")
+        _import_report(ws.import_uploads(uploads), "Imported")
+        return redirect(request.form.get("next") or url_for("today"))
+
+    @app.post("/import/watch")
+    def import_watch() -> Response:
+        folder = ws.cfg.watch_folder
+        if not folder or not Path(folder).expanduser().is_dir():
+            raise PlannerError("Plug the watch in (or check the watch folder on Profile).")
+        _import_report(ws.import_files([Path(folder).expanduser()]), "From the watch")
+        return redirect(request.form.get("next") or url_for("today"))
+
+    @app.post("/sync")
+    def sync() -> Response:
+        try:
+            res = ws.sync_garmin(fetch=garmin_fetch)
+        except garmin.GarminError as err:
+            raise PlannerError(str(err)) from None
+        _import_report(res, "Garmin")
+        return redirect(request.form.get("next") or url_for("today"))
+
+    @app.post("/garmin/key")
+    def garmin_key() -> Response:
+        try:
+            path = garmin.save_key(request.form.get("key", ""))
+        except garmin.GarminError as err:
+            raise PlannerError(str(err)) from None
+        flash(f"Garmin key saved to {path} (only your user can read it).", "ok")
+        return redirect(url_for("setup") + "#garmin")
 
     @app.post("/week/plan")
     def plan_week() -> Response:
@@ -227,6 +313,10 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
         if action == "undo":
             ws.log_session(week, f["session"], None)
             flash("Entry cleared.", "info")
+        elif action == "pain":
+            ws.report_pain(week, f["session"])
+            flash("Pain noted. Two sessions in a row with pain pauses that sport until "
+                  "a physio clears you.", "info")
         elif action == "skipped":
             ws.log_session(week, f["session"], "skipped", reason=f.get("reason") or "other")
             flash("Logged as skipped.", "ok")
@@ -355,6 +445,11 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
             raw_text=raw_text, show_raw=bool(request.args.get("raw")), first=cfg is None,
             default_hours=DEFAULT_HOURS, zones=cfg.profile.table() if cfg else [],
             known=cfg.profile.known if cfg else [],
+            experiment=cfg.experiment_start.isoformat() if cfg and cfg.experiment_start else "",
+            watch_folder=cfg.watch_folder or "" if cfg else "",
+            next_monday=week_start(clock().date()) + timedelta(days=7),
+            garmin_lib=garmin.library_installed(), garmin_key=garmin.key_available(),
+            key_file=garmin.KEY_FILE,
         )
 
     def _form_to_config(f: Any) -> dict[str, Any]:
@@ -377,6 +472,12 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
                     raise ValueError(f"{k.replace('_', ' ')} should be a number") from None
         data["profile"] = profile
         data.setdefault("timezone", "Europe/London")
+        data.pop("experiment_start", None)
+        if f.get("experiment") and f.get("experiment_start"):
+            data["experiment_start"] = date.fromisoformat(f["experiment_start"])
+        data.pop("watch_folder", None)
+        if f.get("watch_folder", "").strip():
+            data["watch_folder"] = f["watch_folder"].strip()
 
         locations = []
         for i in sorted({int(k.split("-")[1]) for k in f if k.startswith("loc-")}):

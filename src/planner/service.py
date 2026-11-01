@@ -8,17 +8,26 @@ exactly the same and the tests cover both.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 
+from planner.activities import (
+    Activity,
+    ImportResult,
+    apply_matches,
+    match_activities,
+    read_activity_files,
+    read_bytes,
+)
 from planner.adherence import (
     LOW_RESPONSE,
     AdherenceModel,
     LogRow,
+    Source,
     WeeklySummary,
     read_log,
     sync_log,
@@ -28,11 +37,12 @@ from planner.adherence import (
 from planner.config import AthleteConfig, Slot, calendar_for_week, load_config, week_start
 from planner.export import export_week
 from planner.friendly import resolve_slots
+from planner.garmin import Fetcher, fetch_activities
 from planner.profile import Profile
 from planner.replan import DebtLedger, Injury, Move, frozen_by_pain, replan, substitute
 from planner.report import week_type
-from planner.sessions import build_week_sessions, how_to
-from planner.solver import Placement, Plan, fill_slots, plan_week
+from planner.sessions import Session, build_week_sessions, how_to
+from planner.solver import Placement, Plan, fill_slots, plan_week, slot_uid
 from planner.store import InjuryStore, PlanStore
 from planner.targets import DEFAULT_HOURS, Phase, is_recovery_week, phase_for, weekly_targets
 from planner.workouts import workout_for
@@ -230,7 +240,7 @@ class Workspace:
         recovery = phase != "taper" and is_recovery_week(week, cfg.race_date)
         targets = weekly_targets(cfg.race, phase, available, prev, ramp, weekly_hours=hours,
                                  recovery=recovery)
-        wtype = week_type(week, experiment_start)
+        wtype = week_type(week, experiment_start or cfg.experiment_start)
         aware = wtype == "facility_aware"
         sessions = build_week_sessions(targets, cfg.race, phase, recovery)
         notes: list[str] = []
@@ -354,6 +364,199 @@ class Workspace:
         log[idx] = LogRow.model_validate({**r.model_dump(), **update})
         write_log(self.log_path, log)
         return log[idx]
+
+
+    def report_pain(self, week: date, session_id: str) -> LogRow:
+        """Mark a logged session as painful (e.g. after a watch import, which can't know)."""
+        log = self.log()
+        for i, r in enumerate(log):
+            if r.week == week and r.session_id == session_id and r.logged:
+                log[i] = r.model_copy(update={"pain": True})
+                write_log(self.log_path, log)
+                return log[i]
+        raise PlannerError("Log the session first, then say if something hurt.")
+
+    # ---- watch / Garmin imports ------------------------------------------------------
+    def import_activities(self, acts: list[Activity], source: Source = "file") -> ImportResult:
+        """Tick off planned sessions from recorded activities (each imported once)."""
+        log = self.log()
+        weeks = {week_start(a.start.date()) for a in acts}
+        plans = {w: p for w in weeks if (p := self.plan(w)) is not None}
+        result = match_activities(acts, plans, log)
+        if result.matched:
+            write_log(self.log_path, apply_matches(log, result, source))
+        return result
+
+    def import_files(self, paths: Sequence[Path]) -> ImportResult:
+        acts, bad = read_activity_files(list(paths), self.cfg.timezone)
+        result = self.import_activities(acts, "file")
+        result.unreadable = bad
+        return result
+
+    def import_uploads(self, files: Sequence[tuple[str, bytes]]) -> ImportResult:
+        acts: list[Activity] = []
+        bad: list[str] = []
+        for name, data in files:
+            try:
+                acts += read_bytes(name, data, self.cfg.timezone)
+            except Exception:  # noqa: BLE001 (report the file, keep going)
+                bad.append(name)
+        result = self.import_activities(acts, "file")
+        result.unreadable = bad
+        return result
+
+    def sync_garmin(self, days: int = 14, fetch: Fetcher | None = None) -> ImportResult:
+        end = self.now().date()
+        acts = fetch_activities(end - timedelta(days=days), end, self.cfg.timezone, fetch)
+        return self.import_activities(acts, "garmin_personal")
+
+    # ---- moving a session yourself ---------------------------------------------------
+    def move_options(self, week: date, session_id: str, now: datetime) -> list[MoveOption]:
+        """Every slot from now on where this session fits: kit open, room left."""
+        plan = self.require_plan(week)
+        p = plan.placement(session_id)
+        if p is None:
+            raise PlannerError(f"No session '{session_id}' in the week of {week:%d %b}.")
+        row = self.log_index(week).get(session_id)
+        if row is not None and row.logged:
+            raise PlannerError("That session is already logged. Undo the log entry to move it.")
+        s = p.session
+        others = [q for q in plan.placements if q.session.id != session_id]
+        out: list[MoveOption] = []
+        for k in self.slots(week):
+            if k.starts_at < now or slot_uid(k) == slot_uid(p.slot):
+                continue
+            busy = [(q.start, q.end) for q in others if slot_uid(q.slot) == slot_uid(k)]
+            start = _first_gap(k, s, busy, self.cfg, plan.facility_aware)
+            if start is None:
+                continue
+            moved = p.model_copy(update={"slot": k, "start": start})
+            out.append(MoveOption(uid=slot_uid(k), slot=k, start=start,
+                                  warnings=coaching_warnings([*others, moved], moved)))
+        return out
+
+    def move_session(self, week: date, session_id: str, uid: str, now: datetime
+                     ) -> tuple[Plan, list[str]]:
+        option = next((o for o in self.move_options(week, session_id, now) if o.uid == uid), None)
+        if option is None:
+            raise PlannerError("That slot can't take this session (kit, opening hours or room).")
+        plan = self.require_plan(week)
+        placements = [
+            q.model_copy(update={"slot": option.slot, "start": option.start,
+                                 "reason": "you_moved_it"})
+            if q.session.id == session_id else q
+            for q in plan.placements
+        ]
+        new = plan.model_copy(update={"placements": sorted(placements,
+                                                            key=lambda q: q.starts_at)})
+        wtype = next((r.week_type for r in self.log() if r.week == week), "facility_aware")
+        self._save(new, week, "move", f"Week of {week:%d %b %Y} — moved {session_id}", wtype)
+        return new, option.warnings
+
+    # ---- the season ----------------------------------------------------------------
+    def season(self, today: date) -> list[SeasonWeek]:
+        """Every week from your first plan (or now) to race week: phase, recovery weeks,
+        holidays, what was planned and done, and the volume the planner is heading for."""
+        cfg = self.cfg
+        log = self.log()
+        summaries = {s.week: s for s in weekly_summaries(log)}
+        first = min([*summaries, week_start(today)])
+        last = week_start(cfg.race_date) if cfg.race_date and cfg.race_date > today \
+            else week_start(today) + timedelta(weeks=12)
+        hours = cfg.profile.current_hours or DEFAULT_HOURS[cfg.race]
+        history: list[int] = []
+        out: list[SeasonWeek] = []
+        wk = first
+        while wk <= last:
+            phase = phase_for(wk, cfg.race_date)
+            recovery = phase != "taper" and is_recovery_week(wk, cfg.race_date)
+            slots = calendar_for_week(cfg, wk)
+            available = sum(k.minutes for k in slots)
+            prev = max(history[-2:]) if history else None
+            projected = sum(weekly_targets(cfg.race, phase, available, prev, 0.10,
+                                           weekly_hours=hours, recovery=recovery).values())
+            summ = summaries.get(wk)
+            done = summ.completed_min if summ else None
+            reliable = summ is not None and summ.response_rate >= LOW_RESPONSE and wk < \
+                week_start(today)
+            history.append(done if reliable and done else projected)
+            labels = sorted({o.name for o in cfg.overrides
+                             if o.start <= wk + timedelta(days=6) and o.end >= wk})
+            out.append(SeasonWeek(
+                week=wk, phase=phase, recovery=recovery, available_min=available,
+                projected_min=projected, planned_min=summ.planned_min if summ else None,
+                done_min=done, logged=summ.logged if summ else 0,
+                sessions=summ.sessions if summ else 0,
+                week_type=week_type(wk, cfg.experiment_start), labels=labels,
+                when="past" if wk < week_start(today) else
+                ("now" if wk == week_start(today) else "future"),
+                race=bool(cfg.race_date and wk <= cfg.race_date < wk + timedelta(days=7)),
+            ))
+            wk += timedelta(weeks=1)
+        return out
+
+
+class MoveOption(BaseModel):
+    uid: str
+    slot: Slot
+    start: time
+    warnings: list[str] = []
+
+
+class SeasonWeek(BaseModel):
+    week: date
+    phase: str
+    recovery: bool
+    race: bool
+    available_min: int
+    projected_min: int
+    planned_min: int | None
+    done_min: int | None
+    logged: int
+    sessions: int
+    week_type: str
+    labels: list[str]
+    when: Literal["past", "now", "future"]
+
+
+def _first_gap(slot: Slot, s: Session, busy: list[tuple[time, time]], cfg: AthleteConfig,
+               facility_aware: bool) -> time | None:
+    """Earliest start in the slot that's free and has the kit open for the whole session."""
+    loc = cfg.location(slot.location)
+    t = datetime.combine(date(2000, 1, 1), slot.start)
+    end = datetime.combine(date(2000, 1, 1), slot.end)
+    step = timedelta(minutes=5)
+    while t + timedelta(minutes=s.duration_min) <= end:
+        a, b = t.time(), (t + timedelta(minutes=s.duration_min)).time()
+        clash = any(a < q_end and q_start < b for q_start, q_end in busy)
+        if not clash and (not facility_aware or s.fits(loc, slot.day, a, b)):
+            return a
+        t += step
+    return None
+
+
+def coaching_warnings(placements: list[Placement], moved: Placement) -> list[str]:
+    """Plain warnings when a hand-made move breaks a coaching rule (it's still allowed)."""
+    day = moved.slot.on
+    if day is None:
+        return []
+    same = [q.session for q in placements if q.slot.on == day and q is not moved]
+    s = moved.session
+    out = []
+    if any(q.discipline == s.discipline for q in same) and s.discipline != "strength":
+        out.append(f"Two {s.discipline} sessions on {day:%A}.")
+    if s.hard and any(q.hard for q in same):
+        out.append(f"Two hard sessions on {day:%A}.")
+    if (s.hard and any(q.kind == "long" for q in same)) or \
+            (s.kind == "long" and any(q.hard for q in same)):
+        out.append(f"A hard session and a long one on {day:%A}.")
+    if s.kind == "long" and any(q.kind == "long" for q in same):
+        out.append(f"Two long sessions on {day:%A}.")
+    if s.hard:
+        for d in (day - timedelta(days=1), day + timedelta(days=1)):
+            if any(q.session.hard for q in placements if q.slot.on == d and q is not moved):
+                out.append(f"Hard sessions on back-to-back days ({d:%A}).")
+    return out
 
 
 def placements_on(plan: Plan, day: date) -> list[Placement]:

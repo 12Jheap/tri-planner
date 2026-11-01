@@ -10,7 +10,7 @@ which slots you really train in, re-plans when life happens, and measures one th
 Python 3.11+.
 
 ```bash
-pip install -e ".[fit,web]"
+pip install -e ".[fit,web,garmin]"     # garmin needs Python 3.12+
 ```
 
 ## Quick start: the website (easiest)
@@ -43,6 +43,41 @@ pool's open), and when you're free each day. Then:
 home screen. Only do this on wifi you trust, because anyone on it can open the page.
 
 The website and the commands below use the same files, so you can mix them.
+
+## Logging without typing: Garmin and watch files
+
+**Garmin Connect (easiest).** Make a Personal API key at
+[Garmin Connect → Personal API](https://connect.garmin.com/app/settings/personalApiToken),
+then paste it on **Profile → Garmin Connect**. It's saved to
+`~/.config/garmin/connect-personal-api-key` (readable only by you), the same place Garmin's
+own client looks, and never into this project. Or set it yourself:
+
+```bash
+mkdir -p ~/.config/garmin && printf '%s\n' 'YOUR-KEY' > ~/.config/garmin/connect-personal-api-key && chmod 600 ~/.config/garmin/connect-personal-api-key
+```
+
+Then press **Sync from Garmin** on Today (or run `tri-plan sync`). It downloads your
+last two weeks of activities and ticks off the sessions they match: same sport, same
+week, closest day and time. Done on another day counts as "moved", and a ride with a run
+straight after it counts as the brick. Anything that wasn't in the plan is listed, not
+forced in. Each activity is imported once, and sessions you logged yourself are never
+overwritten. Your watch can't know if something hurt, so imported sessions have a
+**Something hurt** button.
+
+**Watch files.** No key? Use **Add activity files** on Today for .fit files, or Garmin
+Connect's "Export original" .zip. Or set the watch's activity folder on Profile and import
+over USB, or run `tri-plan import /path/to/GARMIN/Activity`.
+
+## Season, moving sessions and the experiment
+
+- **Season** shows every week to race day: phase, recovery weeks, holidays and exams,
+  planned vs done, and the volume the planner is heading for.
+- **Move a session yourself:** open it and choose **Move this session**. You only see
+  slots where its kit is open and there's room. If the move breaks a coaching rule (two
+  hard days in a row, hard on a long day) it's allowed, but you'll be told.
+- **The experiment:** switch it on in **Profile → The experiment**. Weeks alternate
+  between normal and time-only test weeks, and Progress compares how much you complete in
+  each.
 
 ## Quick start: the terminal
 
@@ -144,13 +179,14 @@ version, never overwritten), `injuries.json`, and one folder per week.
 - `service.py`: every action (plan, log, re-plan) in one place, used by both front ends
 - `web.py` + `templates/` + `static/`: the local website (Flask)
 - `export.py`: `.ics` calendar and `.FIT` structured workouts
+- `activities.py` / `garmin.py`: read recorded activities (files or Garmin Personal API) and match them to the plan
 - `report.py`: experiment schedule and completion report
 
 ## Quality gates
 
 ```bash
-pip install -e ".[fit,web,dev]"
+pip install -e ".[fit,web,garmin,dev]"
 pytest && ruff check . && mypy src
 ```
 
-49 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–076).
+55 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–082).

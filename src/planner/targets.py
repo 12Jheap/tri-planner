@@ -36,6 +36,9 @@ DEFAULT_HOURS: dict[str, float] = {"sprint": 7.0, "olympic": 9.0}
 PHASE_VOLUME: dict[str, float] = {"base": 1.0, "build": 1.1, "taper": 0.6}
 RECOVERY_VOLUME = 0.7
 
+# Most a club athlete needs for the distance; the weekly ramp stops here.
+MAX_HOURS: dict[str, float] = {"sprint": 11.0, "olympic": 14.0}
+
 
 def is_recovery_week(week: date, race_date: date | None) -> bool:
     """Every 4th week is lighter: 5, 9, 13… weeks out from the race (then taper)."""
@@ -76,7 +79,8 @@ def weekly_targets(
     """Minutes per discipline for the coming week.
 
     Total = available time × phase utilisation, capped by:
-    - what you did recently × (1 + ramp) when that's known (×0.6 in taper), else
+    - what you did recently × (1 + ramp) when that's known (×0.6 in taper), never past
+      the distance's ceiling (sprint 11h, Olympic 14h), else
     - what you train now (weekly_hours) × phase volume.
     Recovery weeks take 30% off. Free time is only ever a ceiling.
     """
@@ -93,7 +97,8 @@ def weekly_targets(
     if previous_week_minutes is not None:
         # Progress from what you actually did: +ramp a week, or a cut for taper.
         grow = PHASE_VOLUME["taper"] if phase == "taper" else 1 + ramp
-        total = min(total, previous_week_minutes * grow)
+        ceiling = max(MAX_HOURS[race], (weekly_hours or 0) * 1.2) * 60
+        total = min(total, previous_week_minutes * grow, ceiling)
     elif weekly_hours is not None:
         total = min(total, weekly_hours * 60 * PHASE_VOLUME[phase])
     if recovery:

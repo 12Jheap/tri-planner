@@ -36,14 +36,22 @@
 {% if row %}
   <form method="post" action="{{ url_for('log') }}" class="log logged {{ 'done' if row.status in ('done', 'moved') else 'skipped' }}">
     <span>
-      {% if row.status in ('done', 'moved') %}Done · {{ row.actual_min }} min{{ ' · another time' if row.status == 'moved' }}{{ ' · pain noted' if row.pain }}
+      {% if row.status in ('done', 'moved') %}Done · {{ row.actual_min }} min{{ ' · another day' if row.status == 'moved' }}
+        {%- if row.distance_m %} · {{ '%.1f'|format(row.distance_m / 1000) }} km{% endif %}
+        {%- if row.avg_hr %} · {{ row.avg_hr }} bpm{% endif %}
+        {%- if row.avg_power %} · {{ row.avg_power }} W{% endif %}
+        {%- if row.source in ('garmin_personal', 'file') %} <span class="muted" style="font-weight:500">· from {{ 'Garmin' if row.source == 'garmin_personal' else 'watch file' }}</span>{% endif %}
+        {%- if row.pain %} · pain noted{% endif %}
       {% else %}Skipped · {{ reasons.get(row.reason, row.reason) }}{% endif %}
     </span>
     <input type="hidden" name="token" value="{{ token }}">
     <input type="hidden" name="week" value="{{ c.week }}">
     <input type="hidden" name="session" value="{{ s.id }}">
     <input type="hidden" name="next" value="{{ next }}">
-    <button class="quiet" name="action" value="undo">Undo</button>
+    <span class="row" style="gap:0">
+      {% if row.status in ('done', 'moved') and not row.pain %}<button class="quiet" name="action" value="pain">Something hurt</button>{% endif %}
+      <button class="quiet" name="action" value="undo">Undo</button>
+    </span>
   </form>
 {% elif c.loggable %}
   <div class="log row">

@@ -19,6 +19,7 @@
 </div>
 
 {% for b in banners %}<div class="msg">{{ b }}</div>{% endfor %}
+{% if test_week %}<div class="msg"><b>Time-only test week.</b> Like most apps, this week's plan ignores where the kit is. Train what you can and log honestly: comparing these weeks with normal ones is the experiment.</div>{% endif %}
 {% if race_in_week %}<div class="msg">Race week. Race on {{ race_in_week.strftime('%A %d %B') }}.</div>{% endif %}
 
 {% if not plan %}

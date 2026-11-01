@@ -21,9 +21,11 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from planner.activities import ImportResult
 from planner.adherence import REASONS, LogRow, read_log
 from planner.config import AthleteConfig, ConfigError
 from planner.friendly import parse_injury, parse_week
+from planner.garmin import GarminError
 from planner.profile import Profile
 from planner.report import weekly_report
 from planner.service import (
@@ -215,6 +217,44 @@ def cmd_report(a: argparse.Namespace) -> int:
     return 0
 
 
+def _report_import(res: ImportResult) -> None:
+    for m in res.matched:
+        how = "another day" if m.moved else "done"
+        print(f"✓ {m.activity.describe()} → {m.session_id} ({how})")
+    for x in res.extras:
+        print(f"· {x.describe()}: not in the plan, left alone")
+    if res.duplicates:
+        print(f"· {res.duplicates} already imported")
+    for bad in res.unreadable:
+        print(f"✗ couldn't read {bad}", file=sys.stderr)
+    if not (res.matched or res.extras or res.duplicates):
+        print("Nothing new to log.")
+
+
+def cmd_import(a: argparse.Namespace) -> int:
+    ws = _ws(a)
+    paths = [Path(p).expanduser() for p in a.paths]
+    if not paths and ws.cfg.watch_folder:
+        paths = [Path(ws.cfg.watch_folder).expanduser()]
+    if not paths:
+        raise PlannerError("Give .fit/.zip files or a folder, or set watch_folder in your config.")
+    missing = [str(p) for p in paths if not p.exists()]
+    if missing:
+        raise PlannerError(f"Not found: {', '.join(missing)}")
+    _report_import(ws.import_files(paths))
+    return 0
+
+
+def cmd_sync(a: argparse.Namespace) -> int:
+    ws = _ws(a)
+    try:
+        res = ws.sync_garmin(days=a.days)
+    except GarminError as err:
+        raise PlannerError(str(err)) from None
+    _report_import(res)
+    return 0
+
+
 def cmd_web(a: argparse.Namespace) -> int:
     from planner.web import serve
 
@@ -292,6 +332,19 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--flag", action="append", default=[], metavar="SESSION",
                    help="move this session even if it's in the next 24h")
     r.set_defaults(fn=cmd_replan)
+
+    im = sub.add_parser("import", help="tick off sessions from watch files (.fit / .zip)")
+    im.add_argument("paths", nargs="*", help="files or folders (default: watch_folder)")
+    im.add_argument("--config", dest="config", default=None, help=argparse.SUPPRESS)
+    im.add_argument("--out", default="out")
+    im.add_argument("--prior-alpha", type=float, default=2.0, help=argparse.SUPPRESS)
+    im.add_argument("--prior-beta", type=float, default=2.0, help=argparse.SUPPRESS)
+    im.set_defaults(fn=cmd_import)
+
+    sy = sub.add_parser("sync", help="tick off sessions from Garmin Connect (Personal API)")
+    common(sy, argparse.SUPPRESS)
+    sy.add_argument("--days", type=int, default=14, help="how far back to look (default 14)")
+    sy.set_defaults(fn=cmd_sync)
 
     rep = sub.add_parser("report", help="how much of the plan you actually did")
     rep.add_argument("--out", default="out")
