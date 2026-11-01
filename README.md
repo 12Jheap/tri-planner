@@ -19,6 +19,10 @@ pip install -e ".[fit,web]"
 tri-plan web
 ```
 
+Windows says `'tri-plan' is not recognized`? Switch your virtual environment on first
+(`.venv\Scripts\activate`, you'll see `(.venv)`), or run `python -m planner web`, which
+always works. Every `tri-plan ...` command can be run as `python -m planner ...`.
+
 Your browser opens at http://localhost:8000. The first time, it asks you to set up:
 your race, the hours you want to train, where you train and what's there (and when the
 pool's open), and when you're free each day. Then:
