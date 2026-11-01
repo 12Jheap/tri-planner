@@ -53,6 +53,13 @@ CAPS: dict[str, dict[str, dict[str, int]]] = {
         "run": {"long": 60, "easy": 45, "easy_strides": 45, "tempo": 50, "threshold": 50,
                 "vo2": 45, "openers": 30},
     },
+    "half": {
+        "swim": {"technique": 75, "endurance": 80, "css": 75, "speed": 60, "race_pace": 50},
+        "bike": {"long": 240, "endurance": 120, "tempo": 120, "threshold": 90, "vo2": 75,
+                 "brick": 150, "openers": 60},
+        "run": {"long": 120, "easy": 60, "easy_strides": 60, "tempo": 75, "threshold": 60,
+                "vo2": 50, "openers": 35},
+    },
     "olympic": {
         "swim": {"technique": 70, "endurance": 75, "css": 70, "speed": 55, "race_pace": 45},
         "bike": {"long": 150, "endurance": 90, "tempo": 90, "threshold": 90, "vo2": 75,
@@ -208,6 +215,40 @@ MENU: dict[str, list[Spec]] = {
 }
 OLYMPIC_SCALE = 1.25
 
+# Half distance gets its own menus rather than a scaled sprint week: more sessions
+# (3 swims, 4 rides, 4 runs), much longer long sessions, race-pace work over VO2, and
+# a long brick as a Key session in build. Same tuple layout as MENU.
+HALF_MENU: dict[str, list[Spec]] = {
+    "base": [
+        ("swim", "technique", 2, True, 50, 35), ("swim", "css", 3, True, 55, 40),
+        ("swim", "endurance", 2, False, 50, 35),
+        ("bike", "long", 2, True, 150, 90), ("bike", "tempo", 3, True, 75, 60),
+        ("bike", "endurance", 2, False, 75, 45), ("bike", "endurance", 2, False, 60, 40),
+        ("run", "long", 2, True, 90, 60), ("run", "tempo", 3, True, 50, 40),
+        ("run", "easy_strides", 2, False, 45, 30), ("run", "easy", 1, False, 40, 25),
+    ],
+    "build": [
+        ("swim", "css", 4, True, 55, 40), ("swim", "endurance", 2, False, 50, 35),
+        ("swim", "technique", 2, False, 40, 30),  # 3 swims beat 2 long ones
+        ("bike", "long", 2, True, 210, 120), ("bike", "tempo", 3, True, 90, 60),
+        ("bike", "brick", 3, True, 120, 75), ("bike", "threshold", 4, False, 75, 50),
+        ("bike", "endurance", 2, False, 60, 40),
+        ("run", "long", 2, True, 105, 70), ("run", "tempo", 3, True, 60, 40),
+        ("run", "threshold", 4, False, 50, 35), ("run", "easy_strides", 2, False, 45, 30),
+        # 4 runs max: extra run volume goes into longer easy runs, not a 5th run.
+    ],
+    "taper": [
+        ("swim", "race_pace", 3, True, 40, 30), ("swim", "endurance", 2, False, 35, 25),
+        ("bike", "openers", 3, True, 60, 40), ("bike", "endurance", 2, False, 60, 40),
+        ("run", "openers", 3, True, 30, 20), ("run", "easy", 1, False, 35, 20),
+    ],
+    "recovery": [
+        ("swim", "technique", 2, True, 50, 35), ("swim", "endurance", 2, False, 45, 30),
+        ("bike", "endurance", 2, True, 90, 60), ("bike", "endurance", 2, False, 60, 40),
+        ("run", "easy_strides", 2, True, 45, 30), ("run", "easy", 1, False, 40, 25),
+    ],
+}
+
 
 def _requires(disc: str, kind: str) -> list[list[Facility]]:
     return BRICK_REQUIRES if kind == "brick" else REQUIRES[disc]
@@ -222,7 +263,8 @@ def build_week_sessions(
     the sport's budget is small); Flex sessions are added while budget remains.
     Leftover budget is used later to lengthen aerobic sessions in long slots.
     """
-    menu = MENU["recovery" if recovery and phase != "taper" else phase]
+    menus = HALF_MENU if race == "half" else MENU
+    menu = menus["recovery" if recovery and phase != "taper" else phase]
     scale = OLYMPIC_SCALE if race == "olympic" else 1.0
     sessions: list[Session] = []
     used_ids: set[str] = set()

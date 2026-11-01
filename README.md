@@ -159,6 +159,12 @@ tri-plan replan --flag bike-long             # move this even though it's within
    is short, with nothing on race day. In a packed week (exams) it keeps the most
    valuable sessions instead of giving up.
 
+**Half distance** (1.9km / 90km / 21.1km): pick it on Profile. It starts at about 10h a
+week, can grow to 16h, builds for 12 weeks, and has long rides up to 4h, long runs up to 2h,
+long bricks and race-pace work. Double days (say a swim before school and a ride after) are
+used when the week needs them, but never two sessions of the same sport in a day, and a
+brick counts as a run. Half-iron races (e.g. IRONMAN 70.3) require you to be 18 on race day.
+
 Effort, when there's no number: 3–4/10 easy (full sentences), 6–7/10 tempo (short
 sentences), 7–8/10 threshold (a few words), 9/10 VO2.
 
@@ -202,4 +208,4 @@ pip install -e ".[fit,web,garmin,dev]"
 pytest && ruff check . && mypy src
 ```
 
-61 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–088).
+64 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–091).

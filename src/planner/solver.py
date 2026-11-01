@@ -271,6 +271,8 @@ def _solve(
         s, day = sess[sid], by_uid[uid].on
         if s.discipline != "strength":
             per_day_disc[(day, s.discipline)].append(var)
+        if s.kind == "brick":  # a brick ends with a run: no other run that day
+            per_day_disc[(day, "run")].append(var)
         if s.hard:
             hard_on[day].append(var)
     one_per_day = assume("one session per discipline per day")
@@ -293,10 +295,12 @@ def _solve(
         p = p_complete.get(by_uid[uid].key, default_p)
         terms.append(round(SCALE * p * sess[sid].value) * var)
         s = sess[sid]
-        if s.kind == "long" and s.max_min and by_uid[uid].minutes >= s.max_min:
-            # Long sessions prefer slots with room to grow, ideally at the weekend.
-            weekend = 2 if by_uid[uid].day in ("sat", "sun") else 1
-            terms.append(round(SCALE * LONG_ROOM_BONUS * weekend * s.value) * var)
+        if s.kind == "long":
+            # Long sessions prefer the weekend, and slots with room to grow into.
+            slot = by_uid[uid]
+            weekend = 2 if slot.day in ("sat", "sun") else 1
+            room = 1.0 if slot.minutes >= min(s.max_min or 0, s.duration_min + 30) else 0.5
+            terms.append(round(SCALE * LONG_ROOM_BONUS * weekend * room * s.value) * var)
 
     # Soft: never pair a long session with a hard one on the same day.
     same_day: dict[object, list[tuple[Session, cp_model.IntVar]]] = defaultdict(list)
@@ -305,6 +309,12 @@ def _solve(
     for d_key, items in same_day.items():
         longs = [v for s, v in items if s.kind == "long"]
         hards = [v for s, v in items if s.hard and s.kind != "long"]
+        quality = [v for s, v in items if s.intensity == 3 and s.kind != "long"]
+        for i, lv in enumerate(longs):  # tempo work on a long day: softer, still discouraged
+            for j, qv in enumerate(quality):
+                both = m.NewBoolVar(f"longq[{d_key},{i},{j}]")
+                m.Add(both >= lv + qv - 1)
+                terms.append(-round(SCALE * LONG_HARD_CLASH * 0.6) * both)
         if len(longs) > 1:  # a long ride and a long run on one day is too much
             two = m.NewIntVar(0, len(longs), f"longs[{d_key}]")
             m.Add(two >= sum(longs) - 1)

@@ -234,7 +234,7 @@ class Workspace:
         cfg = self.cfg
         self.out.mkdir(parents=True, exist_ok=True)
         log = self.log()
-        phase = phase or phase_for(week, cfg.race_date)
+        phase = phase or phase_for(week, cfg.race_date, cfg.race)
         slots = calendar_for_week(cfg, week)
         race_day = cfg.race_date if cfg.race_date and week <= cfg.race_date < week + timedelta(
             days=7) else None
@@ -264,13 +264,16 @@ class Workspace:
             notes += [f"{d} paused until {i.until:%a %d %b} (declared injury); its load moved to "
                       f"other sports. Clear the injury when you're back." for d, i in injured.items()]
         model = AdherenceModel(*self.prior).update(log)
+        # Half distance needs more sessions than days, so two-session days are normal
+        # (still never two of the same sport): the cost of stacking a day is lower.
+        stacking = 0.1 if cfg.race == "half" else 0.25
         plan = plan_week(sessions, slots, cfg, model.probabilities(), facility_aware=aware,
-                         default_p=model.p("unseen"))
+                         default_p=model.p("unseen"), stacking_penalty=stacking)
         if plan.status == "infeasible" and any(x.key for x in sessions):
             # A busy week (exams, travel): keep the sessions that fit rather than fail.
             relaxed = [x.model_copy(update={"key": False}) for x in sessions]
             plan = plan_week(relaxed, slots, cfg, model.probabilities(), facility_aware=aware,
-                             default_p=model.p("unseen"))
+                             default_p=model.p("unseen"), stacking_penalty=stacking)
             if plan.status != "infeasible":
                 kept = sum(1 for p in plan.placements if p.session.id in
                            {x.id for x in sessions if x.key})
@@ -567,7 +570,7 @@ class Workspace:
         out: list[SeasonWeek] = []
         wk = first
         while wk <= last:
-            phase = phase_for(wk, cfg.race_date)
+            phase = phase_for(wk, cfg.race_date, cfg.race)
             recovery = phase != "taper" and is_recovery_week(wk, cfg.race_date)
             slots = calendar_for_week(cfg, wk)
             available = sum(k.minutes for k in slots)

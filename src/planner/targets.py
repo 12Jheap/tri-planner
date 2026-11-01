@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-Race = Literal["sprint", "olympic"]
+Race = Literal["sprint", "olympic", "half"]
 Phase = Literal["base", "build", "taper"]
 
 DISCIPLINES: tuple[str, ...] = ("swim", "bike", "run", "strength")
@@ -23,6 +23,8 @@ DISCIPLINES: tuple[str, ...] = ("swim", "bike", "run", "strength")
 SPLITS: dict[str, dict[str, float]] = {
     "sprint": {"swim": 0.22, "bike": 0.40, "run": 0.30, "strength": 0.08},
     "olympic": {"swim": 0.20, "bike": 0.45, "run": 0.28, "strength": 0.07},
+    # Half (1.9km / 90km / 21.1km): the bike is ~half the race, the run is long.
+    "half": {"swim": 0.15, "bike": 0.50, "run": 0.30, "strength": 0.05},
 }
 
 # How much of the athlete's available time to fill, by phase. Never plan 100%:
@@ -30,14 +32,17 @@ SPLITS: dict[str, dict[str, float]] = {
 UTILISATION: dict[str, float] = {"base": 0.80, "build": 0.80, "taper": 0.50}
 
 # Sensible base-phase weekly hours for a club-level athlete who sets no target.
-DEFAULT_HOURS: dict[str, float] = {"sprint": 7.0, "olympic": 9.0}
+DEFAULT_HOURS: dict[str, float] = {"sprint": 7.0, "olympic": 9.0, "half": 10.0}
 
 # Volume relative to base hours: build adds a little, taper cuts ~40%.
 PHASE_VOLUME: dict[str, float] = {"base": 1.0, "build": 1.1, "taper": 0.6}
 RECOVERY_VOLUME = 0.7
 
 # Most a club athlete needs for the distance; the weekly ramp stops here.
-MAX_HOURS: dict[str, float] = {"sprint": 11.0, "olympic": 14.0}
+MAX_HOURS: dict[str, float] = {"sprint": 11.0, "olympic": 14.0, "half": 16.0}
+
+# Weeks of build before the 2-week taper: a half needs longer to build endurance.
+BUILD_WEEKS: dict[str, int] = {"sprint": 8, "olympic": 8, "half": 12}
 
 
 def is_recovery_week(week: date, race_date: date | None) -> bool:
@@ -48,9 +53,9 @@ def is_recovery_week(week: date, race_date: date | None) -> bool:
     return weeks_out >= 5 and (weeks_out - 1) % 4 == 0
 
 
-def phase_for(week: date, race_date: date | None) -> Phase:
+def phase_for(week: date, race_date: date | None, race: str = "sprint") -> Phase:
     """Pick the phase from weeks to go: taper in the last 2 weeks, build for the
-    8 weeks before that, base otherwise (and after the race)."""
+    8 weeks before that (12 for a half), base otherwise (and after the race)."""
     if race_date is None:
         return "base"
     days = (race_date - week).days
@@ -58,7 +63,7 @@ def phase_for(week: date, race_date: date | None) -> Phase:
         return "base"
     if days < 14:
         return "taper"
-    if days < 70:
+    if days < 14 + 7 * BUILD_WEEKS.get(race, 8):
         return "build"
     return "base"
 
@@ -86,7 +91,7 @@ def weekly_targets(
     Recovery weeks take 30% off. Free time is only ever a ceiling.
     """
     if race not in SPLITS:
-        raise ValueError(f"unknown race '{race}' (sprint or olympic)")
+        raise ValueError(f"unknown race '{race}' (sprint, olympic or half)")
     if phase not in UTILISATION:
         raise ValueError(f"unknown phase '{phase}' (base, build or taper)")
     if available_minutes < 0 or ramp < 0:

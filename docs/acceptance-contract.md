@@ -663,6 +663,29 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 - **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_088_effort_check_flags_easy_sessions_done_too_hard` (pytest, 1 Nov 2026)
 - **Verified-by:** pytest
 
+### US-019: Half distance (v0)
+
+#### AC-089: Half distance is a race option (Profile and init) with bike-heavy splits, more volume (10h default, ramping to a 16h ceiling), a 12-week build, and a clear note that half-iron races need you to be 18
+- **Method:** e2e-test
+- **Test:** `tests/test_us_019_half_distance.py` > test_ac_089_half_distance_is_a_race_option_with_bigger_training
+- **Status:** verified
+- **Evidence:** `tests/test_us_019_half_distance.py::test_ac_089_half_distance_is_a_race_option_with_bigger_training` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-090: Half sessions go long-course: long rides up to 4h, long runs up to 2h with fuelling notes, a long brick as a Key build session with a proper run off the bike, and race-pace (tempo) work rather than sprint-style VO2
+- **Method:** unit-test
+- **Test:** `tests/test_us_019_half_distance.py` > test_ac_090_half_sessions_are_long_course_sessions
+- **Status:** verified
+- **Evidence:** `tests/test_us_019_half_distance.py::test_ac_090_half_sessions_are_long_course_sessions` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-091: A half week on a school timetable uses double days when it needs to, never two sessions of the same sport in a day (a brick counts as a run), keeps the long ride and long run on different days and puts them at the weekend when the slots allow
+- **Method:** e2e-test
+- **Test:** `tests/test_us_019_half_distance.py` > test_ac_091_half_weeks_use_double_days_within_the_rules
+- **Status:** verified
+- **Evidence:** `tests/test_us_019_half_distance.py::test_ac_091_half_weeks_use_double_days_within_the_rules` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
 ## Verification Summary
 | ID | Criterion | Method | Status | Evidence |
 |----|-----------|--------|--------|----------|
@@ -754,7 +777,10 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 | AC-086 | On a low-recovery day with a quality session planned, Today … | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
 | AC-087 | Your threshold, max and resting heart rate can be read from … | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
 | AC-088 | When your watch's average heart rate for an easy session was… | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-089 | Half distance is a race option (Profile and init) with bike-… | e2e-test | verified | test_us_019_half_distance.py |
+| AC-090 | Half sessions go long-course: long rides up to 4h, long runs… | unit-test | verified | test_us_019_half_distance.py |
+| AC-091 | A half week on a school timetable uses double days when it n… | e2e-test | verified | test_us_019_half_distance.py |
 
-Progress: 61/88 verified — v0 (AC-001–AC-027, AC-055–AC-088) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+Progress: 64/91 verified — v0 (AC-001–AC-027, AC-055–AC-091) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
 
 GitHub issue: not created — no repository linked to this session.

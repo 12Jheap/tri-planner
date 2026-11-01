@@ -22,7 +22,7 @@ Two stages:
 
 - Native iOS/Android app, watch app, widgets
 - AI chat coach or LLM-generated plans
-- Long-course (70.3/Ironman) and first-timer onboarding
+- Full Ironman (half distance added in US-019) and first-timer onboarding
 - ML models beyond the Beta-Binomial adherence prior (no LightGBM/PyMC until v2, 1k+ users)
 - HRV-driven automatic changes (v2; v1 readiness is self-reported)
 - Phone health-store sync (a PWA can't read Apple Health / Health Connect)
@@ -162,6 +162,17 @@ key), which fits v0. US-013's push integration via the Training/Health APIs stay
 
 Note: the recovery check offers a change and never makes one. It is the athlete's own
 signals, not a diagnosis (no injury or "injury prevention" claims). Plain rules only.
+
+### US-019: Half distance
+**Description:** As an athlete, I want to train for a half (1.9km / 90km / 21.1km) with the volume, long sessions and double days it needs, without the plan getting reckless.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] Half distance is a race option (Profile and init) with bike-heavy splits, more volume (10h default, ramping to a 16h ceiling), a 12-week build, and a clear note that half-iron races need you to be 18
+- [ ] Half sessions go long-course: long rides up to 4h, long runs up to 2h with fuelling notes, a long brick as a Key build session with a proper run off the bike, and race-pace (tempo) work rather than sprint-style VO2
+- [ ] A half week on a school timetable uses double days when it needs to, never two sessions of the same sport in a day (a brick counts as a run), keeps the long ride and long run on different days and puts them at the weekend when the slots allow
+
+Note: added at Joe's request (scope change, 1 Nov 2026). Full Ironman stays out of scope.
+Half-iron races require athletes to be 18 on race day; the app says so where the race is chosen.
 
 ### v1 — MVP web app (only if gates pass)
 

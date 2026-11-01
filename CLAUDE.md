@@ -6,16 +6,17 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
 
 ## Context
 - `docs/design.md` — verdict, positioning, phase plan with go/kill gates
-- `docs/prd.md` — user stories (v0 = US-001..006, US-014..018; v1 hosted app = US-007..013)
-- `docs/acceptance-contract.md` — AC-001..AC-088; AC-001..027 and AC-055..088 verified
+- `docs/prd.md` — user stories (v0 = US-001..006, US-014..019; v1 hosted app = US-007..013)
+- `docs/acceptance-contract.md` — AC-001..AC-091; AC-001..027 and AC-055..091 verified
   (US-014 usability, US-015 web app, US-016 sessions, US-017 import/season/move,
-  US-018 strength opt-out, auto-sync, recovery check, Garmin HR, effort check)
+  US-018 strength opt-out, auto-sync, recovery check, Garmin HR, effort check, US-019 half)
 - `docs/competitor-research.md` — competitor matrix and sources
 
 ## Scope rules
 - v0 only until the Feb 2027 gate (own completion ≥50% for 6 weeks; no rival handles the
   scripted two-location week). Don't start v1 (web app, Stripe, Garmin push) without being asked.
-- Out of scope: native app, AI chat coach, long-course, ML beyond the Beta-Binomial prior,
+- Out of scope: native app, AI chat coach, full Ironman (half distance is in, US-019; it needs
+  athletes to be 18 on race day), ML beyond the Beta-Binomial prior,
   Strava data, users under 18, injury diagnosis or "injury prevention" claims.
 - Hard constraints are never broken: no session where its facility is missing or closed.
 

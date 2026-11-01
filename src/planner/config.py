@@ -176,7 +176,7 @@ class Override(BaseModel):
 
 class AthleteConfig(BaseModel):
     athlete: str
-    race: Literal["sprint", "olympic"]
+    race: Literal["sprint", "olympic", "half"]
     race_date: date | None = None
     weekly_hours: float | None = None  # older name for profile.current_hours
     timezone: str = "Europe/London"

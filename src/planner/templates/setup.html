@@ -73,7 +73,9 @@
         <select name="race">
           <option value="sprint" {{ 'selected' if form.race == 'sprint' }}>Sprint · 750m / 20km / 5km</option>
           <option value="olympic" {{ 'selected' if form.race == 'olympic' }}>Olympic · 1.5km / 40km / 10km</option>
+          <option value="half" {{ 'selected' if form.race == 'half' }}>Half · 1.9km / 90km / 21.1km</option>
         </select>
+        <span class="hint">Half means 10–16h weeks, double days and a 12-week build. Half-iron races (e.g. IRONMAN 70.3) require you to be 18 on race day.</span>
       </label>
       <label>Race date <input type="date" name="race_date" value="{{ form.race_date }}">
         <span class="hint">Sets base, build, taper and recovery weeks.</span></label>

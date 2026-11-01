@@ -165,11 +165,14 @@ def run_wizard(ask: Ask, say: Say) -> dict[str, Any]:
 
     def race_kind(t: str) -> str:
         t = t.strip().lower() or "sprint"
-        if t not in ("sprint", "olympic"):
-            raise ValueError("sprint or olympic")
+        if t not in ("sprint", "olympic", "half"):
+            raise ValueError("sprint, olympic or half")
         return t
 
-    race = _ask_until_ok(ask, say, "Race distance, sprint or olympic [sprint]: ", race_kind)
+    race = _ask_until_ok(ask, say, "Race distance, sprint, olympic or half [sprint]: ",
+                         race_kind)
+    if race == "half":
+        say("  Note: half-iron races (e.g. IRONMAN 70.3) require you to be 18 on race day.")
 
     def race_day(t: str) -> date | None:
         return date.fromisoformat(t.strip()) if t.strip() else None

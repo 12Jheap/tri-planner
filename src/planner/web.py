@@ -218,8 +218,9 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
         return render_template(
             "week.html", week=week, plan=plan, days=days, summary=ws.summary(week),
             prev=week - timedelta(days=7), next=week + timedelta(days=7),
-            this_week=week_start(now_.date()), phase=phase_for(week, race),
-            recovery=is_recovery_week(week, race) and phase_for(week, race) != "taper",
+            this_week=week_start(now_.date()), phase=phase_for(week, race, ws.cfg.race),
+            recovery=is_recovery_week(week, race) and phase_for(week, race, ws.cfg.race)
+            != "taper",
             race_in_week=race if race and week <= race < week + timedelta(days=7) else None,
             has_files=(wk_dir / "plan.ics").exists(), banners=banners(week),
             fits=len(list(wk_dir.glob("*.fit"))) if wk_dir.exists() else 0,

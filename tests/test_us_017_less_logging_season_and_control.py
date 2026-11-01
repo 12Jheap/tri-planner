@@ -191,8 +191,10 @@ def test_ac_080_watch_files_tick_off_the_right_sessions_once(tmp_path):
     run = _first(ws, "run")
     bike = _first(ws, "bike")
     day_run = make_fit(run.starts_at + timedelta(minutes=3), "run", 38.5, km=7.4, hr=151)
-    other_day = run.slot.on + timedelta(days=1) if run.slot.on.weekday() < 6 \
-        else run.slot.on - timedelta(days=1)  # type: ignore[operator]
+    bike_days = {p.slot.on for p in ws.plan(WEEK).placements  # type: ignore[union-attr]
+                 if p.session.discipline == "bike"}
+    other_day = next(WEEK + timedelta(days=i) for i in range(7)  # a day with no ride planned
+                     if WEEK + timedelta(days=i) not in bike_days)
     bike_moved = make_fit(datetime.combine(other_day, bike.start), "bike", 52, km=21,  # type: ignore[arg-type]
                           watts=168)
     extra = make_fit(datetime(2026, 11, 12, 20, 0), "swim", 30, km=1.5)  # no swim then

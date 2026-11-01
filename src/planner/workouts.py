@@ -162,7 +162,8 @@ class _Builder:
                     self.step("Walk / jog back", 70 / 60, "recovery")]),
             ]
         if k == "long" and m >= 45:
-            return [Block(steps=[self.step("Easy", m - 10, "easy")]),
+            fuel = "take a drink or gel every 30–40 minutes" if m >= 75 else ""
+            return [Block(steps=[self.step("Easy", m - 10, "easy", fuel)]),
                     Block(steps=[self.step("Finish steady", 10, "steady")])]
         if k == "tempo":
             return self.intervals(10, 5, (6, 8, 10), 2, "tempo", "Tempo", "Easy jog",
@@ -201,7 +202,7 @@ class _Builder:
             return self.intervals(15, max(5, int(m) - 15 - 12), 1, 2, "threshold",
                                   "Race effort", "Easy", max_reps=4)
         if k == "brick":
-            run = max(8, min(20, int(m) // 4))
+            run = max(8, min(30 if m >= 100 else 20, int(m) // 4))  # longer leg for a half
             ride = m - run
             easy = min(10, ride * 0.3)
             race = min(10, ride * 0.3)
