@@ -60,7 +60,7 @@ def to_ics(plan: Plan, path: str | Path, tz: str = "Europe/London",
     return out
 
 
-HR_ZONE = {"recovery": 1, "easy": 2, "steady": 2, "tempo": 3, "threshold": 4, "vo2": 5,
+HR_ZONE = {"recovery": 1, "easy": 2, "steady": 2, "race": 3, "tempo": 3, "threshold": 4, "vo2": 5,
            "sprint": 5}
 STEP_KIND = {"Warm-up": "warmup", "Cool-down": "cooldown"}
 MAX_STEPS = 60

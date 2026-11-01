@@ -174,6 +174,13 @@ signals, not a diagnosis (no injury or "injury prevention" claims). Plain rules 
 Note: added at Joe's request (scope change, 1 Nov 2026). Full Ironman stays out of scope.
 Half-iron races require athletes to be 18 on race day; the app says so where the race is chosen.
 
+### US-020: Season and plan agree; half workouts are race-specific
+**Description:** As an athlete, I want the volume Season shows for a week to be what I get when I plan it, and my half-distance sessions to train half-distance race efforts, not longer Olympic sessions.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] Planning any week targets the same volume the Season view shows for it (one shared rule); weeks planned far ahead say they assume you complete the weeks before, and a past week you didn't log holds volume flat instead of growing it
+- [ ] Half workouts differ from Olympic ones: race-effort blocks (76–83% FTP) in the long ride, a half-marathon-pace finish to the long run, longer CSS reps, long sweet-spot intervals and a brick that runs at half-marathon effort, with the same targets on the watch
+
 ### v1 — MVP web app (only if gates pass)
 
 ### US-007: 3-minute onboarding to week-1 preview

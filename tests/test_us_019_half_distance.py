@@ -58,8 +58,9 @@ def test_ac_090_half_sessions_are_long_course_sessions(tmp_path):
         counts[s.discipline] += 1
     assert counts["swim"] >= 3 and counts["bike"] >= 4 and counts["run"] == 4  # never 5
     brick = workout_for(build["bike-brick"])
-    leg = next(st for b in brick.blocks for st in b.steps if st.label.startswith("Run"))
-    assert leg.seconds >= 25 * 60
+    leg = sum(st.seconds for b in brick.blocks for st in b.steps if st.label.startswith("Run"))
+    assert leg >= 25 * 60  # settle in, then run at half-marathon effort
+    assert any(st.zone == "race" for b in brick.blocks for st in b.steps)
     long_run = Session(id="run-long", discipline="run", kind="long", duration_min=105,
                        intensity=2, requires=[], key=True)
     notes = [st.note for b in workout_for(long_run).blocks for st in b.steps]

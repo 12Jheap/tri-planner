@@ -243,7 +243,14 @@ class Workspace:
         if not slots:
             raise PlannerError(f"No free time in the week of {week:%d %b}: add some slots.")
         available = sum(s.minutes for s in slots)
-        prev = prev_minutes if prev_minutes is not None else self._previous_minutes(log, week)
+        ahead = False
+        if prev_minutes is not None:
+            prev: int | None = prev_minutes
+        else:  # same rule as the Season view, so the two always agree
+            today = self.now().date()
+            chain = {c.week: c for c in self.volume_chain(today, week)}
+            prev = chain[week].prev if week in chain else self._previous_minutes(log, week)
+            ahead = week > week_start(today) + timedelta(days=7)
         hours = cfg.profile.current_hours or DEFAULT_HOURS[cfg.race]
         recovery = phase != "taper" and is_recovery_week(week, cfg.race_date)
         targets = weekly_targets(cfg.race, phase, available, prev, ramp, weekly_hours=hours,
@@ -252,6 +259,10 @@ class Workspace:
         aware = wtype == "facility_aware"
         sessions = build_week_sessions(targets, cfg.race, phase, recovery)
         notes: list[str] = []
+        if ahead:
+            notes.append("Planned ahead from your season projection, which assumes you "
+                         "complete the weeks before. Re-plan it nearer the time to size it "
+                         "from what you've actually done.")
         if recovery:
             notes.insert(0, "Recovery week: about 30% less and no hard sessions, so the last "
                             "three weeks' work turns into fitness.")
@@ -562,27 +573,14 @@ class Workspace:
         cfg = self.cfg
         log = self.log()
         summaries = {s.week: s for s in weekly_summaries(log)}
-        first = min([*summaries, week_start(today)])
         last = week_start(cfg.race_date) if cfg.race_date and cfg.race_date > today \
             else week_start(today) + timedelta(weeks=12)
-        hours = cfg.profile.current_hours or DEFAULT_HOURS[cfg.race]
-        history: list[int] = []
         out: list[SeasonWeek] = []
-        wk = first
-        while wk <= last:
-            phase = phase_for(wk, cfg.race_date, cfg.race)
-            recovery = phase != "taper" and is_recovery_week(wk, cfg.race_date)
-            slots = calendar_for_week(cfg, wk)
-            available = sum(k.minutes for k in slots)
-            prev = max(history[-2:]) if history else None
-            projected = sum(weekly_targets(cfg.race, phase, available, prev, 0.10,
-                                           weekly_hours=hours, recovery=recovery,
-                                           strength=cfg.strength).values())
+        for step in self.volume_chain(today, last):
+            wk, phase, recovery, available, projected = (
+                step.week, step.phase, step.recovery, step.available, step.projected)
             summ = summaries.get(wk)
             done = summ.completed_min if summ else None
-            reliable = summ is not None and summ.response_rate >= LOW_RESPONSE and wk < \
-                week_start(today)
-            history.append(done if reliable and done else projected)
             labels = sorted({o.name for o in cfg.overrides
                              if o.start <= wk + timedelta(days=6) and o.end >= wk})
             out.append(SeasonWeek(
@@ -595,8 +593,55 @@ class Workspace:
                 ("now" if wk == week_start(today) else "future"),
                 race=bool(cfg.race_date and wk <= cfg.race_date < wk + timedelta(days=7)),
             ))
+        return out
+
+    def volume_chain(self, today: date, last: date) -> list[ChainStep]:
+        """Week-by-week volume from your first logged week (or now) to `last`.
+
+        One rule for the Season view *and* for planning any week, so they always agree:
+        each week grows ≤10% on the bigger of the two weeks before it. A past week you
+        logged well counts as what you did; one you didn't log enough of holds volume
+        flat (no evidence, no growth); weeks still to come assume you complete them.
+        """
+        cfg = self.cfg
+        summaries = {s.week: s for s in weekly_summaries(self.log())}
+        hours = cfg.profile.current_hours or DEFAULT_HOURS[cfg.race]
+        this_week = week_start(today)
+        history: list[int] = []
+        out: list[ChainStep] = []
+        wk = min([*summaries, this_week])
+        while wk <= last:
+            phase = phase_for(wk, cfg.race_date, cfg.race)
+            recovery = phase != "taper" and is_recovery_week(wk, cfg.race_date)
+            available = sum(k.minutes for k in calendar_for_week(cfg, wk))
+            prev = max(history[-2:]) if history else None
+            projected = sum(weekly_targets(cfg.race, phase, available, prev, 0.10,
+                                           weekly_hours=hours, recovery=recovery,
+                                           strength=cfg.strength).values())
+            out.append(ChainStep(week=wk, phase=phase, recovery=recovery, available=available,
+                                 prev=prev, projected=projected))
+            summ = summaries.get(wk)
+            if wk < this_week:
+                reliable = summ is not None and summ.response_rate >= LOW_RESPONSE \
+                    and summ.completed_min > 0
+                if reliable:
+                    assert summ is not None
+                    history.append(summ.completed_min)
+                else:
+                    history.append(min(projected, prev) if prev else projected)
+            else:
+                history.append(projected)
             wk += timedelta(weeks=1)
         return out
+
+
+class ChainStep(BaseModel):
+    week: date
+    phase: str
+    recovery: bool
+    available: int
+    prev: int | None  # the volume this week ramps from
+    projected: int
 
 
 class SyncStatus(BaseModel):

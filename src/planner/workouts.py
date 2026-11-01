@@ -152,8 +152,28 @@ class _Builder:
         return blocks
 
     # ---- run -----------------------------------------------------------------------
+    @property
+    def half(self) -> bool:
+        return self.s.race == "half"
+
+    @property
+    def building(self) -> bool:
+        return self.s.phase == "build"
+
     def run(self) -> list[Block]:
         k, m = self.s.kind, self.total / 60
+        if self.half and k == "long" and m >= 75:
+            fuel = "practise race fuelling: a gel or drink every 30 minutes"
+            if self.building:  # finish at the pace you'll race the half marathon
+                return [Block(steps=[self.step("Easy", m - 35, "easy", fuel)]),
+                        Block(steps=[self.step("Half-marathon effort", 25, "race",
+                                               "the pace you'll hold off the bike")]),
+                        Block(steps=[self.step("Easy", 10, "easy")])]
+            return [Block(steps=[self.step("Easy", m - 15, "easy", fuel)]),
+                    Block(steps=[self.step("Finish steady", 15, "steady")])]
+        if self.half and k == "tempo":
+            return self.intervals(10, 5, (10, 15, 20), 3, "race", "Half-marathon effort",
+                                  "Easy jog", max_reps=3)
         if k == "easy_strides" and m >= 25:
             return [
                 Block(steps=[self.step("Easy run", m - 9, "easy")]),
@@ -182,6 +202,40 @@ class _Builder:
     # ---- bike ----------------------------------------------------------------------
     def bike(self) -> list[Block]:
         k, m = self.s.kind, self.total / 60
+        fuel = "practise race fuelling: 60–90 g of carbs an hour, drink every 15 minutes"
+        if self.half and k == "long" and m >= 120 and self.building:
+            reps = int(min(3, (m - 30) // 30))
+            steady = m - 20 - reps * 30 - 10
+            blocks = [Block(steps=[self.step("Easy spin", 20, "easy")]),
+                      Block(reps=reps, steps=[
+                          self.step("Half race effort", 25, "race",
+                                    "the effort you'll hold for 90 km; aero position"),
+                          self.step("Easy", 5, "easy")])]
+            if steady >= 5:
+                blocks.append(Block(steps=[self.step("Steady endurance", steady, "steady",
+                                                     fuel)]))
+            blocks.append(Block(steps=[self.step("Easy spin", 10, "easy")]))
+            return blocks
+        if self.half and k == "long" and m >= 75:
+            return [Block(steps=[self.step("Easy spin", 15, "easy")]),
+                    Block(steps=[self.step("Steady endurance", m - 25, "steady", fuel)]),
+                    Block(steps=[self.step("Easy spin", 10, "easy")])]
+        if self.half and k == "tempo":
+            return self.intervals(10, 5, (15, 20, 30), 5, "tempo", "Sweet spot", "Easy",
+                                  max_reps=3)
+        if self.half and k == "brick" and m >= 90:
+            run = max(20, min(30, int(m) // 4))
+            ride = m - run
+            return [
+                Block(steps=[self.step("Easy spin", 15, "easy")]),
+                Block(steps=[self.step("Steady", ride - 45, "steady", fuel)]),
+                Block(steps=[self.step("Half race effort", 30, "race",
+                                       "finish the ride at race effort")]),
+                Block(steps=[self.step("Run off the bike: settle", 10, "steady",
+                                       "change shoes fast; quick short steps", disc="run")]),
+                Block(steps=[self.step("Run at half-marathon effort", run - 10, "race",
+                                       disc="run")]),
+            ]
         if k == "long":
             if m >= 75:
                 return [Block(steps=[self.step("Easy spin", 15, "easy")]),
@@ -239,6 +293,9 @@ class _Builder:
             fixed = [self.swim_set("Drill", 6, 50, "easy", 20,
                                    "catch-up, fingertip drag, 6-kick switch")]
             main = ("Steady", 100, "steady", 15)
+        elif k == "css" and self.half:  # longer reps for a 1.9 km swim
+            main = (("CSS", 200, "threshold", 20) if self.s.intensity >= 4
+                    else ("Tempo", 300, "tempo", 30))
         elif k == "css":
             main = (("CSS", 100, "threshold", 15) if self.s.intensity >= 4
                     else ("Tempo", 200, "tempo", 20))
@@ -248,6 +305,8 @@ class _Builder:
         elif k == "race_pace":
             fixed = [self.swim_set("Race pace", 6, 50, "threshold", 20)]
             main = ("Easy", 100, "easy", 15)
+        elif self.half:
+            main = ("Steady", 400, "steady", 30)
         else:
             main = ("Steady", 200, "steady", 20)
         label, dist, zone, rest = main
@@ -255,8 +314,11 @@ class _Builder:
         one = int(dist / 100 * self.p.swim_speed(zone)) + rest
         reps = max(2, left // one)
         # Quality sets stay a sensible size (e.g. ≤ 1200m at CSS); spare time becomes pull.
-        cap = {"threshold": 1200, "tempo": 1200}.get(zone, 10_000) // dist
-        out = [wu, *fixed, self.swim_set(label, int(min(reps, cap)), dist, zone, rest)]
+        limit = 1600 if self.half else 1200
+        cap = {"threshold": limit, "tempo": limit}.get(zone, 10_000) // dist
+        note = "sight forwards every 6–8 strokes, like open water" if self.half and \
+            dist >= 300 else ""
+        out = [wu, *fixed, self.swim_set(label, int(min(reps, cap)), dist, zone, rest, note)]
         left -= int(min(reps, cap)) * one
         pull = int(100 / 100 * self.p.swim_speed("steady")) + 15
         if left >= 2 * pull:

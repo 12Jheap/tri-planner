@@ -371,3 +371,5 @@ table.data td.feel { color: var(--muted); }
 .ready ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; color: var(--ink-2); }
 .ready li.flag { color: var(--ink); font-weight: 600; }
 .effort-note { font-weight: 500; font-size: 13px; color: var(--bad); margin-top: 4px; }
+:root { --z-race: #8fb7a4; }
+.z-race { background: var(--z-race); }

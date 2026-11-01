@@ -133,6 +133,8 @@ class Session(BaseModel):
     value: float = 0.0
     min_min: int | None = None  # shortest useful version
     max_min: int | None = None  # longest sensible version (filling a long slot)
+    race: str = ""  # what it's for: shapes the workout (a half's long ride ≠ a sprint's)
+    phase: str = ""
 
     def model_post_init(self, _ctx: object) -> None:
         if self.value == 0.0:
@@ -280,7 +282,8 @@ def build_week_sessions(
         return Session(
             id=sid, discipline=disc, kind=kind,  # type: ignore[arg-type]
             duration_min=minutes, intensity=intensity, requires=_requires(disc, kind), key=key,
-            min_min=min(_round5(lo * (1.15 if scale > 1 else 1)), minutes), max_min=max(hi, minutes),
+            min_min=min(_round5(lo * (1.15 if scale > 1 else 1)), minutes),
+            max_min=max(hi, minutes), race=race, phase="recovery" if recovery else phase,
         )
 
     for disc in ("swim", "bike", "run"):

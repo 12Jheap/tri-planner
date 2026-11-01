@@ -686,6 +686,22 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 - **Evidence:** `tests/test_us_019_half_distance.py::test_ac_091_half_weeks_use_double_days_within_the_rules` (pytest, 1 Nov 2026)
 - **Verified-by:** pytest
 
+### US-020: Season and plan agree; half workouts are race-specific (v0)
+
+#### AC-092: Planning any week targets the same volume the Season view shows for it (one shared rule); weeks planned far ahead say they assume you complete the weeks before, and a past week you didn't log holds volume flat instead of growing it
+- **Method:** e2e-test
+- **Test:** `tests/test_us_020_season_agrees_and_half_specific.py` > test_ac_092_planning_a_week_matches_what_season_shows
+- **Status:** verified
+- **Evidence:** `tests/test_us_020_season_agrees_and_half_specific.py::test_ac_092_planning_a_week_matches_what_season_shows` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-093: Half workouts differ from Olympic ones: race-effort blocks (76–83% FTP) in the long ride, a half-marathon-pace finish to the long run, longer CSS reps, long sweet-spot intervals and a brick that runs at half-marathon effort, with the same targets on the watch
+- **Method:** unit-test
+- **Test:** `tests/test_us_020_season_agrees_and_half_specific.py` > test_ac_093_half_workouts_are_built_for_the_half
+- **Status:** verified
+- **Evidence:** `tests/test_us_020_season_agrees_and_half_specific.py::test_ac_093_half_workouts_are_built_for_the_half` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
 ## Verification Summary
 | ID | Criterion | Method | Status | Evidence |
 |----|-----------|--------|--------|----------|
@@ -780,7 +796,9 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 | AC-089 | Half distance is a race option (Profile and init) with bike-… | e2e-test | verified | test_us_019_half_distance.py |
 | AC-090 | Half sessions go long-course: long rides up to 4h, long runs… | unit-test | verified | test_us_019_half_distance.py |
 | AC-091 | A half week on a school timetable uses double days when it n… | e2e-test | verified | test_us_019_half_distance.py |
+| AC-092 | Planning any week targets the same volume the Season view sh… | e2e-test | verified | test_us_020_season_agrees_and_half_specific.py |
+| AC-093 | Half workouts differ from Olympic ones: race-effort blocks (… | unit-test | verified | test_us_020_season_agrees_and_half_specific.py |
 
-Progress: 64/91 verified — v0 (AC-001–AC-027, AC-055–AC-091) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+Progress: 66/93 verified — v0 (AC-001–AC-027, AC-055–AC-093) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
 
 GitHub issue: not created — no repository linked to this session.

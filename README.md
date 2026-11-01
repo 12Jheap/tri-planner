@@ -163,7 +163,10 @@ tri-plan replan --flag bike-long             # move this even though it's within
 week, can grow to 16h, builds for 12 weeks, and has long rides up to 4h, long runs up to 2h,
 long bricks and race-pace work. Double days (say a swim before school and a ride after) are
 used when the week needs them, but never two sessions of the same sport in a day, and a
-brick counts as a run. Half-iron races (e.g. IRONMAN 70.3) require you to be 18 on race day.
+brick counts as a run. Workouts are built for the half: race-effort blocks (76–83% FTP) in
+the long ride, a half-marathon-pace finish to the long run, 200m CSS reps, 2 × 30 min sweet
+spot, and bricks that run at half-marathon effort. Half-iron races (e.g. IRONMAN 70.3) require
+you to be 18 on race day.
 
 Effort, when there's no number: 3–4/10 easy (full sentences), 6–7/10 tempo (short
 sentences), 7–8/10 threshold (a few words), 9/10 VO2.
@@ -208,4 +211,4 @@ pip install -e ".[fit,web,garmin,dev]"
 pytest && ruff check . && mypy src
 ```
 
-64 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–091).
+66 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–093).

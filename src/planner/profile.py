@@ -19,11 +19,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, field_validator, model_validator
 
-Zone = Literal["recovery", "easy", "steady", "tempo", "threshold", "vo2", "sprint"]
+Zone = Literal["recovery", "easy", "steady", "race", "tempo", "threshold", "vo2", "sprint"]
+# "race" is long-distance race effort (half-iron bike, half-marathon pace). It's used by
+# half-distance workouts only, so it isn't one of the everyday ZONES in the table.
 ZONES: tuple[Zone, ...] = ("recovery", "easy", "steady", "tempo", "threshold", "vo2", "sprint")
 
 ZONE_NAMES: dict[str, str] = {
-    "recovery": "Recovery", "easy": "Easy", "steady": "Steady", "tempo": "Tempo",
+    "recovery": "Recovery", "easy": "Easy", "steady": "Steady", "race": "Race effort",
+    "tempo": "Tempo",
     "threshold": "Threshold", "vo2": "VO2 max", "sprint": "Sprint",
 }
 
@@ -32,6 +35,7 @@ FEEL: dict[str, str] = {
     "recovery": "1–2/10, barely working",
     "easy": "3–4/10, full sentences",
     "steady": "5/10, chatty but focused",
+    "race": "5–6/10, the effort you could hold for hours",
     "tempo": "6–7/10, short sentences",
     "threshold": "7–8/10, comfortably hard, a few words",
     "vo2": "9/10, hard, no talking",
@@ -44,6 +48,7 @@ RUN_THRESHOLD_FROM_5K = 1.06
 RUN: dict[str, tuple[float, float]] = {
     "recovery": (1.35, 1.50), "easy": (1.22, 1.35), "steady": (1.12, 1.22),
     "tempo": (1.05, 1.10), "threshold": (0.98, 1.03),
+    "race": (1.03, 1.07),  # half-marathon pace
 }
 # VO2 and sprint are set from 5k pace instead.
 RUN_FROM_5K: dict[str, tuple[float, float]] = {"vo2": (0.97, 1.01), "sprint": (0.88, 0.93)}
@@ -51,6 +56,7 @@ RUN_FROM_5K: dict[str, tuple[float, float]] = {"vo2": (0.97, 1.01), "sprint": (0
 # Bike: % of FTP (Coggan levels; tempo here covers sweet spot 88–93%).
 BIKE: dict[str, tuple[float, float]] = {
     "recovery": (0.40, 0.55), "easy": (0.56, 0.68), "steady": (0.69, 0.75),
+    "race": (0.76, 0.83),  # half-iron bike
     "tempo": (0.84, 0.93), "threshold": (0.95, 1.05), "vo2": (1.06, 1.20),
     "sprint": (1.30, 1.60),
 }
@@ -60,16 +66,18 @@ BIKE: dict[str, tuple[float, float]] = {
 HR_THRESHOLD: dict[str, tuple[float, float]] = {
     "recovery": (0.70, 0.80), "easy": (0.81, 0.85), "steady": (0.86, 0.89),
     "tempo": (0.90, 0.94), "threshold": (0.95, 1.00), "vo2": (1.01, 1.05),
+    "race": (0.87, 0.91),
 }
 HR_MAX: dict[str, tuple[float, float]] = {
     "recovery": (0.55, 0.64), "easy": (0.65, 0.72), "steady": (0.73, 0.79),
     "tempo": (0.80, 0.86), "threshold": (0.87, 0.92), "vo2": (0.93, 0.97),
+    "race": (0.77, 0.82),
 }
 
 # Swim: seconds per 100m added to CSS (negative = faster).
 SWIM: dict[str, tuple[int, int]] = {
     "recovery": (15, 20), "easy": (10, 15), "steady": (6, 10), "tempo": (3, 5),
-    "threshold": (-1, 2), "vo2": (-6, -3), "sprint": (-12, -8),
+    "threshold": (-1, 2), "vo2": (-6, -3), "sprint": (-12, -8), "race": (3, 6),
 }
 
 DEFAULT_SWIM_PACE = 120  # s/100m, only used to turn swim time into metres when no CSS

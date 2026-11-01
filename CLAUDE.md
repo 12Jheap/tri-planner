@@ -6,10 +6,11 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
 
 ## Context
 - `docs/design.md` — verdict, positioning, phase plan with go/kill gates
-- `docs/prd.md` — user stories (v0 = US-001..006, US-014..019; v1 hosted app = US-007..013)
-- `docs/acceptance-contract.md` — AC-001..AC-091; AC-001..027 and AC-055..091 verified
+- `docs/prd.md` — user stories (v0 = US-001..006, US-014..020; v1 hosted app = US-007..013)
+- `docs/acceptance-contract.md` — AC-001..AC-093; AC-001..027 and AC-055..093 verified
   (US-014 usability, US-015 web app, US-016 sessions, US-017 import/season/move,
-  US-018 strength opt-out, auto-sync, recovery check, Garmin HR, effort check, US-019 half)
+  US-018 strength opt-out, auto-sync, recovery check, Garmin HR, effort check, US-019 half,
+  US-020 season = plan volume, race-specific half workouts)
 - `docs/competitor-research.md` — competitor matrix and sources
 
 ## Scope rules
@@ -31,6 +32,7 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
   and the web app both call `Workspace`), web (Flask app, templates/, static/), cli
 - `tri-plan web` is a local, single-athlete site. It is not v1: no accounts, hosting or payments.
 - Volume = what the athlete trains now, ramped ~10%/week from logged work, capped by free time.
+  `Workspace.volume_chain` is the one rule for both Season and planning; don't fork it.
   Don't reintroduce "fill every free minute": it's the fastest route to injury.
 - Garmin key: only from `GARMIN_PERSONAL_API_KEY` or `~/.config/garmin/connect-personal-api-key`
   (0600). Never write it into the repo, the config or `out/`. Tests must not touch the real home
