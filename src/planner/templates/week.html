@@ -1,66 +1,79 @@
 {% extends "base.html" %}
-{% from "_session.html" import session with context %}
+{% from "_session.html" import block with context %}
 {% block title %}Week of {{ week.strftime('%d %b') }} · tri-planner{% endblock %}
 {% block body %}
-<div class="pager">
-  <a href="{{ url_for('week_view', w=prev) }}" aria-label="Previous week">←</a>
-  <div style="text-align:center">
-    <h1>Week of {{ week.strftime('%d %b') }}</h1>
-    <p class="muted small">{{ 'This week' if week == this_week else ('Next week' if (week - this_week).days == 7 else '') }}{{ ' · ' if week == this_week or (week - this_week).days == 7 }}{{ phase }} phase</p>
+<div class="head">
+  <div>
+    <div class="eyebrow">
+      {{ 'This week' if week == this_week else ('Next week' if (week - this_week).days == 7 else week.strftime('%Y')) }}
+      · {{ 'Recovery week' if recovery else phase|capitalize ~ ' phase' }}
+      {%- if weeks_to_race is not none and weeks_to_race > 0 %} · {{ weeks_to_race }} weeks to race{% endif %}
+    </div>
+    <h1>{{ week.strftime('%d %b') }} – {{ days[-1].date.strftime('%d %b') }}</h1>
   </div>
-  <a href="{{ url_for('week_view', w=next) }}" aria-label="Next week">→</a>
+  <div class="nav">
+    <a class="iconbtn" href="{{ url_for('week_view', w=prev) }}" aria-label="Previous week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></a>
+    {% if week != this_week %}<a class="btn" href="{{ url_for('week_view') }}">This week</a>{% endif %}
+    <a class="iconbtn" href="{{ url_for('week_view', w=next) }}" aria-label="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></a>
+  </div>
 </div>
 
-{% for b in banners %}<div class="flash info">{{ b }}</div>{% endfor %}
-
-{% if summary %}
-<div class="progress">
-  <div class="bar"><span style="width: {{ [summary.ratio * 100, 100]|min }}%"></span></div>
-  <p class="small muted">{{ fmt_min(summary.completed_min) }} of {{ fmt_min(summary.planned_min) }} done · {{ summary.logged }}/{{ summary.sessions }} logged</p>
-</div>
-{% endif %}
+{% for b in banners %}<div class="msg">{{ b }}</div>{% endfor %}
+{% if race_in_week %}<div class="msg">Race week. Race on {{ race_in_week.strftime('%A %d %B') }}.</div>{% endif %}
 
 {% if not plan %}
-  <div class="panel empty">
-    <div class="big">🗓️</div>
-    <h2>Nothing planned for this week</h2>
-    <p class="muted">Aiming for about {{ hours|round(1) }}h ({{ phase }} phase). The plan fits your free slots and where the kit is.</p>
-    <form method="post" action="{{ url_for('plan_week') }}">
+  <div class="empty">
+    <h3>Nothing planned for this week</h3>
+    <p class="muted">It starts from what you train now (about {{ hours|round(1) }}h a week), fits the right sessions into your free slots and the kit that's there, and uses spare slot time for extra aerobic work.</p>
+    <form method="post" action="{{ url_for('plan_week') }}" style="margin-top:14px">
       <input type="hidden" name="token" value="{{ token }}">
       <input type="hidden" name="week" value="{{ week }}">
       <button class="primary">Plan this week</button>
     </form>
   </div>
 {% else %}
-  {% for d in days %}
-    <section class="day{{ ' today' if d.today }}">
-      <h2>{{ d.date.strftime('%A') }} <span class="muted small">{{ d.date.strftime('%d %b') }}</span></h2>
-      {% for c in d['items'] %}
-        {{ session(c, url_for('week_view', w=week), compact=True) }}
-      {% else %}
-        <p class="rest">Rest</p>
-      {% endfor %}
-    </section>
-  {% endfor %}
-  <p class="small muted" style="margin-top:16px">Planned {{ fmt_min(plan.planned_minutes) }}.
-    {% if plan.dropped %}Didn't fit: {{ plan.dropped|map(attribute='id')|join(', ') }}.{% endif %}</p>
-
-  <h2>Get it on your calendar and watch</h2>
-  <div class="actions">
-    {% if has_files %}<a class="btn" href="{{ url_for('files', week=week, kind='plan.ics') }}">📅 Calendar file (.ics)</a>{% endif %}
-    {% if fits %}<a class="btn" href="{{ url_for('files', week=week, kind='workouts.zip') }}">⌚ {{ fits }} Garmin workouts (.zip)</a>{% endif %}
+  {% set total = plan.planned_minutes %}
+  <div class="stats">
+    <div class="stat"><div class="v tnum">{{ fmt_min(total) }}</div><div class="k">planned</div></div>
+    <div class="stat"><div class="v tnum">{{ plan.placements|length }}</div><div class="k">sessions</div></div>
+    {% if summary %}<div class="stat"><div class="v tnum">{{ (summary.ratio * 100)|round|int }}%</div><div class="k">done so far</div></div>{% endif %}
   </div>
-  <p class="small muted">Calendar: open the file, or import it in Google Calendar (Settings → Import).
-    Garmin: unzip and copy the .fit files to <code>GARMIN/NewFiles</code> on your watch over USB.</p>
+  <div class="sportbar">{% for sp, m in totals.items() if m %}<i class="s-{{ sp }}" style="flex: {{ m }}"></i>{% endfor %}</div>
+  <div class="sportkey" style="margin-bottom:20px">{% for sp, m in totals.items() if m %}<span class="sport s-{{ sp }}" style="text-transform:none;letter-spacing:0;font-weight:500;font-size:13px">{{ sp|capitalize }} <b>{{ fmt_min(m) }}</b></span>{% endfor %}</div>
 
-  <h2>Changes</h2>
-  <div class="actions">
-    {% if week == this_week %}<a class="btn primary" href="{{ url_for('replan_form') }}">🔀 Something's changed</a>{% endif %}
-    <form method="post" action="{{ url_for('plan_week') }}" onsubmit="return confirm('Start this week again from scratch? What you have logged is kept.')">
-      <input type="hidden" name="token" value="{{ token }}">
-      <input type="hidden" name="week" value="{{ week }}">
-      <button>Plan again from scratch</button>
-    </form>
+  <div class="week">
+    {% for d in days %}
+      <div class="col{{ ' today' if d.today }}{{ ' past' if d.past }}">
+        <div class="dh"><b>{{ d.date.strftime('%a') }}</b><span>{{ d.date.strftime('%d') }}</span></div>
+        <div class="items">
+          {% for c in d['items'] %}{{ block(c) }}{% else %}<div class="rest">Rest</div>{% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% if plan.dropped %}<p class="small muted" style="margin-top:10px">Left out for lack of room: {{ plan.dropped|map(attribute='title')|join(', ') }}.</p>{% endif %}
+
+  <div class="two" style="margin-top:8px">
+    <div>
+      <h2>Calendar and watch</h2>
+      <div class="row">
+        {% if has_files %}<a class="btn" href="{{ url_for('files', week=week, kind='plan.ics') }}">Calendar file (.ics)</a>{% endif %}
+        {% if fits %}<a class="btn" href="{{ url_for('files', week=week, kind='workouts.zip') }}">{{ fits }} Garmin workouts (.zip)</a>{% endif %}
+      </div>
+      <p class="small muted" style="max-width:60ch">Calendar: open the file, or in Google Calendar use Settings → Import. Each event has the full workout.
+        Garmin: unzip and copy the .fit files to <code>GARMIN/NewFiles</code> on the watch over USB. Steps carry your pace, power or heart-rate targets.</p>
+    </div>
+    <div>
+      <h2>Changes</h2>
+      <div class="row">
+        {% if week == this_week %}<a class="btn primary" href="{{ url_for('replan_form') }}">Something's changed</a>{% endif %}
+        <form method="post" action="{{ url_for('plan_week') }}" onsubmit="return confirm('Plan this week again from scratch? Anything you have logged is kept.')">
+          <input type="hidden" name="token" value="{{ token }}">
+          <input type="hidden" name="week" value="{{ week }}">
+          <button>Re-plan from scratch</button>
+        </form>
+      </div>
+    </div>
   </div>
 {% endif %}
 {% endblock %}

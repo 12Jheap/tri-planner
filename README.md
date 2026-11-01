@@ -24,7 +24,8 @@ Windows says `'tri-plan' is not recognized`? Switch your virtual environment on 
 always works. Every `tri-plan ...` command can be run as `python -m planner ...`.
 
 Your browser opens at http://localhost:8000. The first time, it asks you to set up:
-your race, the hours you want to train, where you train and what's there (and when the
+your race, your current fitness (5k time, swim CSS, FTP, heart rate: all optional), where
+you train and what's there (and when the
 pool's open), and when you're free each day. Then:
 
 - **Today**: your sessions with how to do each one, and one-tap **Done it** / **Skipped**.
@@ -84,21 +85,34 @@ tri-plan replan --flag bike-long             # move this even though it's within
 - A Key session you logged as **skipped** gets one catch-up if there's room. A session
   you just haven't logged is treated as unknown, not missed.
 
-## How much it plans
+## How the plan is made
 
-- **Volume comes from your `weekly_hours`**, not your free time (defaults: sprint 7h,
-  Olympic 9h). Build weeks add ~10%, taper cuts ~40%. It never fills more than 80% of
-  your free time, and never jumps more than 10% above what you actually did last week
-  (only counted if you logged at least 70% of it).
-- **Phase is automatic** from `race_date`: taper in the last 2 weeks, build for the 8
-  weeks before that, base otherwise. Override with `--phase`.
-- **Session lengths are capped for your race.** Sprint: long run ≤ 60', long ride ≤ 2h,
-  swims ≤ 60'. Olympic: long run ≤ 80', long ride ≤ 2h30. Extra volume becomes more
-  sessions, not longer ones.
-- **Key** sessions are protected; **flex** sessions move or drop first. If the long ride
-  doesn't fit any slot this week, it's shortened to the longest slot that can take it.
+**You say when you're free and how fit you are now. It does the rest.**
 
-Effort is out of 5: 2 = you can chat, 3 = short sentences, 4 = a few words, 5 = flat out.
+1. **Sessions.** Each phase has a menu of real sessions. *Base* has one quality
+   session per sport (tempo run, sweet-spot ride, CSS swim) on top of long and easy
+   aerobic work. *Build* adds threshold Key sessions, VO2 repeats and a brick. *Taper*
+   keeps short race-pace openers and cuts the volume. Every 4th week before the race is
+   a lighter recovery week. The phase comes from your `race_date`.
+2. **Your zones.** A recent 5k time gives run paces; swim CSS (or a 400m + 200m time
+   trial) gives swim paces; FTP gives bike watts; threshold or max heart rate gives HR
+   ranges. Each session becomes a structured workout (warm-up, main set, cool-down), e.g.
+   *12 min easy · 4 × 6 min threshold @ 4:09–4:22/km, 2 min jog · 8 min easy*. The same
+   steps and targets go into your calendar and the Garmin .FIT files. With no numbers,
+   targets are by feel.
+3. **Fitting it in.** The solver puts each session in a free slot where the kit is
+   open. It spreads quality days, keeps hard sessions off long-session days, keeps the
+   long ride and long run on different days, and prefers weekends for long sessions.
+   Then aerobic sessions **grow into spare slot time** up to the week's budget. Interval
+   sessions keep their shape.
+4. **How much.** The budget starts from what you train now (`current_hours`) and grows
+   about 10% a week from what you actually logged. Free time is a ceiling, not a target:
+   filling every free minute is the fastest way to get injured, so it won't. Race week
+   is short, with nothing on race day. In a packed week (exams) it keeps the most
+   valuable sessions instead of giving up.
+
+Effort, when there's no number: 3–4/10 easy (full sentences), 6–7/10 tempo (short
+sentences), 7–8/10 threshold (a few words), 9/10 VO2.
 
 ## The experiment
 
@@ -116,10 +130,13 @@ version, never overwritten), `injuries.json`, and one folder per week.
 ## How it works
 
 - `config.py`: locations, facilities, windows, slots, overrides (validated)
-- `targets.py`: weekly minutes per sport from target hours, phase and a +10% ramp cap
-- `sessions.py`: session library, race-specific length caps, plain-English instructions
+- `profile.py`: your fitness numbers and the zones they give (run pace, swim pace, watts, HR)
+- `targets.py`: weekly minutes per sport from current training, phase, ramp, recovery weeks
+- `sessions.py`: session menus per phase, Key vs Flex, min/ideal/max lengths, facility needs
+- `workouts.py`: each session as warm-up, main set and cool-down with your targets
 - `solver.py`: OR-Tools CP-SAT. Hard facility/window/overlap/hard-day constraints;
-  maximises Σ P(complete | slot) × value, minus churn and same-day stacking
+  maximises Σ P(complete | slot) × value, minus churn, stacking and bad session pairings;
+  then fills spare slot time
 - `adherence.py`: log I/O, keeping the log in sync with the plan, Beta-Binomial per slot
 - `replan.py`: 24h freeze, churn penalty, reason codes, injury remap, debt ledger, pain freeze
 - `store.py`: append-only plan history and remembered injuries
@@ -136,4 +153,4 @@ pip install -e ".[fit,web,dev]"
 pytest && ruff check . && mypy src
 ```
 
-43 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–070).
+49 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–076).

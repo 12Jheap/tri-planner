@@ -15,7 +15,7 @@ from planner.cli import build_parser
 from planner.config import load_config
 from planner.service import Workspace
 from planner.store import InjuryStore
-from planner.web import create_app
+from planner.web import _fmt_min, create_app
 
 EXAMPLE = Path(__file__).parent.parent / "examples" / "joe.yaml"
 NOW = datetime(2026, 11, 10, 19, 0)  # Tuesday evening
@@ -67,7 +67,8 @@ def test_ac_066_setup_form_writes_a_valid_config_and_rejects_bad_input(tmp_path)
     token = _token(client)
     form = {
         "token": token, "mode": "form", "athlete": "Sam", "race": "olympic",
-        "race_date": "2027-07-04", "weekly_hours": "9",
+        "race_date": "2027-07-04", "p-current_hours": "9", "p-run_5k": "21:30",
+        "p-swim_400": "7:20", "p-swim_200": "3:30", "p-ftp": "210",
         "loc-0-name": "Home", "loc-0-kit": ["road_bike", "outdoor_run"],
         "loc-1-name": "Leisure centre", "loc-1-kit": ["pool", "treadmill"],
         "loc-1-hours-pool": "weekdays 6:30-21:00; weekends 8-18",
@@ -78,7 +79,11 @@ def test_ac_066_setup_form_writes_a_valid_config_and_rejects_bad_input(tmp_path)
     res = client.post("/setup", data=form)
     assert res.status_code == 302
     cfg = load_config(ws.config_path)
-    assert cfg.athlete == "Sam" and cfg.race == "olympic" and cfg.weekly_hours == 9
+    assert cfg.athlete == "Sam" and cfg.race == "olympic" and cfg.profile.current_hours == 9
+    assert cfg.profile.run_5k == 21 * 60 + 30 and cfg.profile.ftp == 210
+    assert cfg.profile.swim_css == (440 - 210) // 2  # worked out from the time trials
+    assert "21:30" in ws.config_path.read_text()  # stored as a readable time
+    assert "Your zones" in client.get("/setup").get_data(as_text=True)
     pool = next(f for f in cfg.location("Leisure centre").facilities if f.name.value == "pool")
     assert len(pool.windows) == 2 and pool.windows[0].days == ["mon", "tue", "wed", "thu", "fri"]
     assert [s.day for s in cfg.templates[cfg.default_template].slots] == ["mon", "mon", "sat"]
@@ -126,8 +131,8 @@ def test_ac_067_planning_from_the_website_writes_the_same_files_and_offers_downl
     assert plan is not None and plan.placements
     assert len([r for r in read_log(ws.log_path) if r.week == WEEK]) == len(plan.placements)
     page = client.get(f"/week?w={WEEK}").get_data(as_text=True)
-    assert f"Planned {plan.planned_minutes // 60}h{plan.planned_minutes % 60:02d}" in page
-    assert "Bike long" in page and "Calendar file" in page
+    assert _fmt_min(plan.planned_minutes) in page and "planned" in page
+    assert all(p.session.title in page for p in plan.placements) and "Calendar file" in page
     ics = client.get(f"/files/{WEEK}/plan.ics")
     assert ics.status_code == 200 and b"BEGIN:VCALENDAR" in ics.data
     z = zipfile.ZipFile(BytesIO(client.get(f"/files/{WEEK}/workouts.zip").data))
@@ -142,7 +147,7 @@ def test_ac_068_log_done_skipped_and_undo_from_the_website(tmp_path):
     _plan(client, token)
     mon, tue = (next(r for r in ws.log() if r.on == d) for d in (WEEK, date(2026, 11, 10)))
     today = client.get("/").get_data(as_text=True)
-    assert "Not logged yet" in today and "Done it" in today  # Monday waits to be logged
+    assert "Not logged yet" in today and "Mark done" in today  # Monday waits to be logged
 
     def post(**kw):
         return client.post("/log", data={"token": token, "week": str(WEEK), "next": "/", **kw})

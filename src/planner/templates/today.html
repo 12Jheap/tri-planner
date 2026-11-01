@@ -1,65 +1,74 @@
 {% extends "base.html" %}
-{% from "_session.html" import session with context %}
+{% from "_session.html" import full, log_controls with context %}
 {% block title %}Today · tri-planner{% endblock %}
+{% block main_class %}narrow{% endblock %}
 {% block body %}
-<div class="pager">
-  <a href="{{ url_for('today', d=prev) }}" aria-label="Previous day">←</a>
-  <div style="text-align:center">
-    <h1>{{ 'Today' if is_today else day.strftime('%A') }}</h1>
-    <p class="muted small">{{ day.strftime('%A %d %B') }}</p>
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ day.strftime('%A %d %B') }}</div>
+    <h1>{% if not plan %}Today{% elif cards %}{{ cards|length }} session{{ 's' if cards|length > 1 }} · {{ fmt_min(cards|sum(attribute='s.duration_min')) }}{% else %}Rest day{% endif %}</h1>
   </div>
-  <a href="{{ url_for('today', d=next) }}" aria-label="Next day">→</a>
+  <div class="nav">
+    <a class="iconbtn" href="{{ url_for('today', d=prev) }}" aria-label="Previous day"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></a>
+    {% if not is_today %}<a class="btn" href="{{ url_for('today') }}">Today</a>{% endif %}
+    <a class="iconbtn" href="{{ url_for('today', d=next) }}" aria-label="Next day"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></a>
+  </div>
 </div>
 
-{% for b in banners %}<div class="flash info">{{ b }}</div>{% endfor %}
+{% for b in banners %}<div class="msg">{{ b }}</div>{% endfor %}
 
 {% if summary %}
-<div class="progress">
-  <div class="bar" role="img" aria-label="{{ (summary.ratio * 100)|round|int }}% of this week done">
-    <span style="width: {{ [summary.ratio * 100, 100]|min }}%"></span>
-  </div>
-  <p class="small muted">{{ fmt_min(summary.completed_min) }} of {{ fmt_min(summary.planned_min) }} done this week · {{ summary.logged }}/{{ summary.sessions }} sessions logged</p>
-</div>
+  <div class="small muted tnum">This week: {{ fmt_min(summary.completed_min) }} of {{ fmt_min(summary.planned_min) }} done · {{ summary.logged }} of {{ summary.sessions }} logged</div>
+  <div class="meter"><i style="width: {{ [summary.ratio * 100, 100]|min }}%"></i></div>
 {% endif %}
 
 {% if not plan %}
-  <div class="panel empty">
-    <div class="big">📅</div>
-    <h2>No plan for this week yet</h2>
-    <p class="muted">It takes a couple of seconds.</p>
-    <form method="post" action="{{ url_for('plan_week') }}">
+  <div class="empty" style="margin-top:20px">
+    <h3>This week isn't planned yet</h3>
+    <p class="muted">No plan for this week yet. It fits sessions into your free slots and the kit that's there.</p>
+    <form method="post" action="{{ url_for('plan_week') }}" style="margin-top:14px">
       <input type="hidden" name="token" value="{{ token }}">
       <input type="hidden" name="week" value="{{ week }}">
       <button class="primary">Plan this week</button>
     </form>
   </div>
 {% else %}
+  <div style="margin-top:20px">
   {% for c in cards %}
-    {{ session(c, url_for('today', d=day)) }}
+    {{ full(c, url_for('today', d=day)) }}
   {% else %}
-    <div class="panel empty">
-      <div class="big">😴</div>
-      <h2>Rest day</h2>
-      <p class="muted">Nothing planned. Sleep, eat well, stretch if you like.</p>
-    </div>
+    <p class="muted">Nothing planned. Recovery is where the training turns into fitness.</p>
   {% endfor %}
+  </div>
 
   {% if catch_up %}
     <h2>Not logged yet</h2>
-    <p class="small muted">Tick these off so the planner learns which slots work for you.</p>
+    <div class="list">
     {% for c in catch_up %}
-      <p class="small muted" style="margin:14px 0 -6px">{{ c.p.slot.on.strftime('%A') }}</p>
-      {{ session(c, url_for('today', d=day), compact=True) }}
+      <div class="li" id="s-{{ c.s.id }}" style="grid-template-columns: 92px 1fr; align-items: start">
+        <span class="when">{{ c.p.slot.on.strftime('%a') }} {{ c.p.start.strftime('%H:%M') }}</span>
+        <div>
+          <span class="sport s-{{ c.s.discipline }}">{{ c.s.discipline }}</span>
+          <div><a class="t" href="{{ url_for('session_detail', week=c.week, sid=c.s.id) }}" style="text-decoration:none">{{ c.s.title }}</a> <span class="muted">· {{ fmt_min(c.s.duration_min) }}</span></div>
+          {{ log_controls(c, url_for('today', d=day)) }}
+        </div>
+      </div>
     {% endfor %}
+    </div>
   {% endif %}
 
   {% if upcoming %}
     <h2>Coming up</h2>
+    <div class="list">
     {% for p in upcoming %}
-      <p>{{ icon[p.session.discipline] }} <strong>{{ p.slot.on.strftime('%a') }} {{ p.start.strftime('%H:%M') }}</strong>
-        {{ nice(p.session) }} <span class="muted">· {{ p.slot.location }}</span></p>
+      <a class="li" href="{{ url_for('session_detail', week=week, sid=p.session.id) }}">
+        <span class="when">{{ p.slot.on.strftime('%a') }} {{ p.start.strftime('%H:%M') }}</span>
+        <span><span class="t">{{ p.session.title }}</span> <span class="muted">· {{ p.slot.location }}</span></span>
+        <span class="muted tnum">{{ fmt_min(p.session.duration_min) }}</span>
+      </a>
     {% endfor %}
-    <p><a href="{{ url_for('week_view', w=week) }}">See the whole week →</a></p>
+    </div>
+    <p class="small"><a href="{{ url_for('week_view', w=week) }}">Whole week</a></p>
   {% endif %}
 {% endif %}
 {% endblock %}

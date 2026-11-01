@@ -28,12 +28,14 @@ from planner.adherence import (
 from planner.config import AthleteConfig, Slot, calendar_for_week, load_config, week_start
 from planner.export import export_week
 from planner.friendly import resolve_slots
+from planner.profile import Profile
 from planner.replan import DebtLedger, Injury, Move, frozen_by_pain, replan, substitute
 from planner.report import week_type
 from planner.sessions import build_week_sessions, how_to
-from planner.solver import Placement, Plan, fit_to_slots, plan_week
+from planner.solver import Placement, Plan, fill_slots, plan_week
 from planner.store import InjuryStore, PlanStore
-from planner.targets import DEFAULT_HOURS, Phase, phase_for, weekly_targets
+from planner.targets import DEFAULT_HOURS, Phase, is_recovery_week, phase_for, weekly_targets
+from planner.workouts import workout_for
 
 Status = Literal["done", "skipped", "moved"]
 
@@ -54,6 +56,8 @@ class WeekResult(BaseModel):
     notes: list[str]
     files: dict[str, list[Path]]
     log_summary: str
+    recovery: bool = False
+    filled_min: int = 0
 
 
 class ReplanOutcome(BaseModel):
@@ -73,7 +77,8 @@ def status_text(row: LogRow | None) -> str:
     return f"{mark} {row.status}{extra}{' · pain' if row.pain else ''}"
 
 
-def plan_markdown(plan: Plan, title: str, log: dict[str, LogRow] | None = None) -> str:
+def plan_markdown(plan: Plan, title: str, log: dict[str, LogRow] | None = None,
+                  profile: Profile | None = None) -> str:
     status = log is not None
     head = "| Day | Time | Where | Session | Note |" + (" Logged |" if status else "")
     lines = [f"# {title}", "", head, "|---" * (6 if status else 5) + "|"]
@@ -90,11 +95,11 @@ def plan_markdown(plan: Plan, title: str, log: dict[str, LogRow] | None = None) 
         lines.append(row)
     if plan.dropped:
         lines += ["", "Didn't fit this week: " + ", ".join(s.id for s in plan.dropped)]
-    lines += ["", f"Planned: {plan.planned_minutes / 60:.1f}h", "", "## How to do each session", ""]
-    for kind in dict.fromkeys(p.session.kind for p in plan.placements):
-        s = next(p.session for p in plan.placements if p.session.kind == kind)
-        lines.append(f"- **{kind.replace('_', ' ')}**: {how_to(s)}")
-    lines += ["", "Effort is out of 5: 2 = chatty, 3 = short sentences, 4 = a few words."]
+    lines += ["", f"Planned: {plan.planned_minutes / 60:.1f}h", "", "## Sessions", ""]
+    for p in plan.placements:
+        w = workout_for(p.session, profile)
+        head = f"**{p.slot.on:%a} {p.session.title}** ({p.session.duration_min} min)"
+        lines += [f"{head}: {w.summary}", f"  _{how_to(p.session)}_", ""]
     return "\n".join(lines)
 
 
@@ -180,18 +185,20 @@ class Workspace:
 
     # ---- actions -------------------------------------------------------------------
     def _previous_minutes(self, log: list[LogRow], week: date) -> int | None:
-        """What you actually did last week, if you logged enough of it to trust."""
-        last = [s for s in weekly_summaries(log) if s.week == week - timedelta(days=7)]
-        if not last or last[0].completed_min <= 0 or last[0].response_rate < LOW_RESPONSE:
-            return None
-        return last[0].completed_min
+        """What you actually did recently: the bigger of the last two weeks you logged
+        well enough to trust (so a recovery week doesn't reset your progress)."""
+        recent = [s for s in weekly_summaries(log)
+                  if week - timedelta(days=14) <= s.week < week
+                  and s.completed_min > 0 and s.response_rate >= LOW_RESPONSE]
+        return max((s.completed_min for s in recent), default=None)
 
     def _save(self, plan: Plan, week: date, note: str, title: str, wtype: str
               ) -> tuple[int, dict[str, list[Path]], str]:
         wk_dir = self.out / str(week)
-        files = export_week(plan, wk_dir, self.cfg.timezone)
+        files = export_week(plan, wk_dir, self.cfg.timezone, self.cfg.profile)
         version = self.plans().append(plan, week, note)
-        (wk_dir / "plan.md").write_text(plan_markdown(plan, f"{title} (v{version})"), "utf-8")
+        (wk_dir / "plan.md").write_text(
+            plan_markdown(plan, f"{title} (v{version})", profile=self.cfg.profile), "utf-8")
         synced = sync_log(self.log(), _log_rows(plan, week, wtype), week)
         write_log(self.log_path, synced.rows)
         summary = f"log: {synced.added} added, {synced.updated} moved, {synced.removed} removed"
@@ -211,16 +218,25 @@ class Workspace:
         log = self.log()
         phase = phase or phase_for(week, cfg.race_date)
         slots = calendar_for_week(cfg, week)
+        race_day = cfg.race_date if cfg.race_date and week <= cfg.race_date < week + timedelta(
+            days=7) else None
+        if race_day:  # race day itself is for racing
+            slots = [k for k in slots if k.on is not None and k.on < race_day]
         if not slots:
             raise PlannerError(f"No free time in the week of {week:%d %b}: add some slots.")
         available = sum(s.minutes for s in slots)
         prev = prev_minutes if prev_minutes is not None else self._previous_minutes(log, week)
-        hours = cfg.weekly_hours or DEFAULT_HOURS[cfg.race]
-        targets = weekly_targets(cfg.race, phase, available, prev, ramp, weekly_hours=hours)
+        hours = cfg.profile.current_hours or DEFAULT_HOURS[cfg.race]
+        recovery = phase != "taper" and is_recovery_week(week, cfg.race_date)
+        targets = weekly_targets(cfg.race, phase, available, prev, ramp, weekly_hours=hours,
+                                 recovery=recovery)
         wtype = week_type(week, experiment_start)
         aware = wtype == "facility_aware"
-        sessions, notes = fit_to_slots(build_week_sessions(targets, cfg.race, phase), slots, cfg,
-                                       aware)
+        sessions = build_week_sessions(targets, cfg.race, phase, recovery)
+        notes: list[str] = []
+        if recovery:
+            notes.insert(0, "Recovery week: about 30% less and no hard sessions, so the last "
+                            "three weeks' work turns into fitness.")
         istore = self.injuries()
         pain = frozen_by_pain(istore.pain_rows(log))
         injured = {i.discipline: i for i in istore.active(week)}
@@ -232,14 +248,34 @@ class Workspace:
         model = AdherenceModel(*self.prior).update(log)
         plan = plan_week(sessions, slots, cfg, model.probabilities(), facility_aware=aware,
                          default_p=model.p("unseen"))
+        if plan.status == "infeasible" and any(x.key for x in sessions):
+            # A busy week (exams, travel): keep the sessions that fit rather than fail.
+            relaxed = [x.model_copy(update={"key": False}) for x in sessions]
+            plan = plan_week(relaxed, slots, cfg, model.probabilities(), facility_aware=aware,
+                             default_p=model.p("unseen"))
+            if plan.status != "infeasible":
+                kept = sum(1 for p in plan.placements if p.session.id in
+                           {x.id for x in sessions if x.key})
+                notes.append(f"Busy week: {kept} of {sum(x.key for x in sessions)} key "
+                             "sessions fit, so the planner kept the most valuable ones.")
         if plan.status == "infeasible":
             raise PlannerError(f"Can't build this week: {plan.reason}")
+        notes += plan.notes
+        if race_day:
+            notes.insert(0, f"Race week: race on {race_day:%A %d %b}. Short and sharp, "
+                            "nothing on race day.")
+        # Use spare slot time: lengthen aerobic sessions up to each sport's budget.
+        budget = {d: max(targets.get(d, 0), sum(x.duration_min for x in sessions
+                                                if x.discipline == d)) for d in targets}
+        filled = 0
+        if phase != "taper":  # a taper is meant to be short; don't pad it out
+            plan, filled = fill_slots(plan, cfg, budget, aware)
         title = f"Week of {week:%d %b %Y} — {phase}, {wtype.replace('_', '-')}"
         version, files, synced = self._save(plan, week, "week", title, wtype)
         return WeekResult(
             week=week, phase=phase, week_type=wtype, plan=plan, version=version, targets=targets,
             available_min=available, previous_min=prev, notes=notes, files=files,
-            log_summary=synced,
+            log_summary=synced, recovery=recovery, filled_min=filled,
         )
 
     def replan(

@@ -21,6 +21,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import yaml
 from pydantic import BaseModel, ValidationError, field_validator, model_validator
 
+from planner.profile import Profile
+
 DAYS: tuple[str, ...] = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
 
@@ -176,8 +178,9 @@ class AthleteConfig(BaseModel):
     athlete: str
     race: Literal["sprint", "olympic"]
     race_date: date | None = None
-    weekly_hours: float | None = None  # base-phase training hours you're aiming for
+    weekly_hours: float | None = None  # older name for profile.current_hours
     timezone: str = "Europe/London"
+    profile: Profile = Profile()
     locations: list[Location]
     templates: dict[str, WeekTemplate]
     default_template: str
@@ -198,6 +201,12 @@ class AthleteConfig(BaseModel):
         except (ZoneInfoNotFoundError, ValueError):
             raise ValueError(f"unknown timezone '{v}' (e.g. Europe/London)") from None
         return v
+
+    @model_validator(mode="after")
+    def _hours_alias(self) -> AthleteConfig:
+        if self.profile.current_hours is None and self.weekly_hours is not None:
+            self.profile.current_hours = self.weekly_hours
+        return self
 
     @model_validator(mode="after")
     def _references(self) -> AthleteConfig:

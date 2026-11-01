@@ -34,6 +34,15 @@ DEFAULT_HOURS: dict[str, float] = {"sprint": 7.0, "olympic": 9.0}
 
 # Volume relative to base hours: build adds a little, taper cuts ~40%.
 PHASE_VOLUME: dict[str, float] = {"base": 1.0, "build": 1.1, "taper": 0.6}
+RECOVERY_VOLUME = 0.7
+
+
+def is_recovery_week(week: date, race_date: date | None) -> bool:
+    """Every 4th week is lighter: 5, 9, 13… weeks out from the race (then taper)."""
+    if race_date is None:
+        return False
+    weeks_out = (race_date - week).days // 7
+    return weeks_out >= 5 and (weeks_out - 1) % 4 == 0
 
 
 def phase_for(week: date, race_date: date | None) -> Phase:
@@ -62,13 +71,14 @@ def weekly_targets(
     previous_week_minutes: int | None = None,
     ramp: float = 0.10,
     weekly_hours: float | None = None,
+    recovery: bool = False,
 ) -> dict[str, int]:
     """Minutes per discipline for the coming week.
 
-    Total = the smallest of:
-    - weekly_hours × phase volume (when you've set an hours target),
-    - available time × phase utilisation,
-    - last week's total × (1 + ramp), when last week is known (default +10%).
+    Total = available time × phase utilisation, capped by:
+    - what you did recently × (1 + ramp) when that's known (×0.6 in taper), else
+    - what you train now (weekly_hours) × phase volume.
+    Recovery weeks take 30% off. Free time is only ever a ceiling.
     """
     if race not in SPLITS:
         raise ValueError(f"unknown race '{race}' (sprint or olympic)")
@@ -80,10 +90,14 @@ def weekly_targets(
         raise ValueError("weekly_hours must be positive")
 
     total = available_minutes * UTILISATION[phase]
-    if weekly_hours is not None:
-        total = min(total, weekly_hours * 60 * PHASE_VOLUME[phase])
     if previous_week_minutes is not None:
-        total = min(total, previous_week_minutes * (1 + ramp))
+        # Progress from what you actually did: +ramp a week, or a cut for taper.
+        grow = PHASE_VOLUME["taper"] if phase == "taper" else 1 + ramp
+        total = min(total, previous_week_minutes * grow)
+    elif weekly_hours is not None:
+        total = min(total, weekly_hours * 60 * PHASE_VOLUME[phase])
+    if recovery:
+        total *= RECOVERY_VOLUME
 
     split = SPLITS[race]
     targets = {d: _round5(total * split[d]) for d in DISCIPLINES}

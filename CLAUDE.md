@@ -6,9 +6,9 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
 
 ## Context
 - `docs/design.md` — verdict, positioning, phase plan with go/kill gates
-- `docs/prd.md` — user stories (v0 = US-001..006, US-014, US-015; v1 hosted app = US-007..013)
-- `docs/acceptance-contract.md` — AC-001..AC-070; AC-001..027 and AC-055..070 verified
-  (US-014 usability, US-015 local web app)
+- `docs/prd.md` — user stories (v0 = US-001..006, US-014..016; v1 hosted app = US-007..013)
+- `docs/acceptance-contract.md` — AC-001..AC-076; AC-001..027 and AC-055..076 verified
+  (US-014 usability, US-015 local web app, US-016 personalised sessions)
 - `docs/competitor-research.md` — competitor matrix and sources
 
 ## Scope rules
@@ -19,11 +19,15 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
 - Hard constraints are never broken: no session where its facility is missing or closed.
 
 ## Code
-- `src/planner/`: config, targets, sessions, solver (OR-Tools CP-SAT), adherence,
+- `src/planner/`: config, profile (fitness numbers -> zones), targets, sessions (library +
+  menus per phase), workouts (warm-up/main set/cool-down with targets), solver (OR-Tools CP-SAT
+  + slot filling), adherence,
   replan, store (append-only JSONL + injuries), export (.ics/.FIT), report,
   friendly (plain-English CLI inputs), wizard (`init`), service (shared actions: the CLI
   and the web app both call `Workspace`), web (Flask app, templates/, static/), cli
 - `tri-plan web` is a local, single-athlete site. It is not v1: no accounts, hosting or payments.
+- Volume = what the athlete trains now, ramped ~10%/week from logged work, capped by free time.
+  Don't reintroduce "fill every free minute": it's the fastest route to injury.
 - Every test is named `test_ac_NNN_...` and maps to a criterion in the contract. Keep that mapping.
 - Example athlete config: `examples/joe.yaml` (holiday/exam dates are placeholders)
 

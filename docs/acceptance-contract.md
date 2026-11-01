@@ -417,7 +417,7 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 
 ### US-014: Everyday usability and sane training load (v0)
 
-#### AC-055: Weekly volume comes from the athlete's target hours; free time is only a ceiling (build +10%, taper −40%)
+#### AC-055: Weekly volume starts from what the athlete trains now and ramps from what they actually did; free time is only a ceiling (build +10%, taper −40%) — amended 1 Nov 2026: no target-hours input
 - **Method:** unit-test
 - **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_055_weekly_volume_comes_from_target_hours_not_free_time
 - **Status:** verified
@@ -531,6 +531,50 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 - **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_070_forms_only_accept_posts_from_the_app_itself` (pytest, 1 Nov 2026)
 - **Verified-by:** pytest
 
+### US-016: Personalised sessions planned into your availability (v0)
+
+#### AC-071: A 5k time, swim CSS (or 400m + 200m time trials), FTP and threshold or max HR give personal run pace, swim pace, bike power and HR zones that don't overlap; missing numbers fall back to effort; impossible numbers are rejected
+- **Method:** unit-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_071_fitness_numbers_give_personal_non_overlapping_zones
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_071_fitness_numbers_give_personal_non_overlapping_zones` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-072: Base has tempo, sweet-spot and CSS work; build adds threshold Key sessions plus VO2 and a brick; taper keeps short race-pace openers; every 4th week before the race is a lighter recovery week with no hard sessions
+- **Method:** unit-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_072_every_phase_has_the_right_quality_work_and_recovery_weeks
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_072_every_phase_has_the_right_quality_work_and_recovery_weeks` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-073: Every session is a structured workout (warm-up, main set, cool-down) that adds up to its planned length, with targets from your zones, and the same steps and targets go into the calendar event and the .FIT file
+- **Method:** integration-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_073_structured_workouts_with_targets_on_screen_calendar_and_watch
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_073_structured_workouts_with_targets_on_screen_calendar_and_watch` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-074: Sessions are fitted into your free slots and aerobic sessions grow into spare slot time up to the week's budget, never past a session's maximum, the next session, or a facility's opening hours; volume grows from what you train now and what you actually did
+- **Method:** unit-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_074_availability_drives_the_plan_and_spare_slot_time_is_used
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_074_availability_drives_the_plan_and_spare_slot_time_is_used` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-075: Across a real season: no hard session on the same day as a long one, long ride and long run on different days, nothing on race day, and a packed exam week keeps its most valuable sessions instead of failing
+- **Method:** e2e-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_075_coaching_rules_hold_across_a_real_season
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_075_coaching_rules_hold_across_a_real_season` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-076: The profile page asks for current fitness and shows your zones; each session page shows why, a zone timeline and every step with your targets; the interface uses no emoji
+- **Method:** e2e-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_076_profile_and_session_pages_show_personal_targets_without_emoji
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_076_profile_and_session_pages_show_personal_targets_without_emoji` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
 ## Verification Summary
 | ID | Criterion | Method | Status | Evidence |
 |----|-----------|--------|--------|----------|
@@ -604,7 +648,13 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 | AC-068 | From Today or Week: Done (minutes, something hurt, another t… | e2e-test | verified | test_us_015_local_web_app.py |
 | AC-069 | "Something's changed" re-plans from ticked slots, a new or c… | e2e-test | verified | test_us_015_local_web_app.py |
 | AC-070 | Every form needs the page's secret token, so another website… | unit-test | verified | test_us_015_local_web_app.py |
+| AC-071 | A 5k time, swim CSS (or 400m + 200m time trials), FTP and th… | unit-test | verified | test_us_016_personalised_training.py |
+| AC-072 | Base has tempo, sweet-spot and CSS work; build adds threshol… | unit-test | verified | test_us_016_personalised_training.py |
+| AC-073 | Every session is a structured workout (warm-up, main set, co… | integration-test | verified | test_us_016_personalised_training.py |
+| AC-074 | Sessions are fitted into your free slots and aerobic session… | unit-test | verified | test_us_016_personalised_training.py |
+| AC-075 | Across a real season: no hard session on the same day as a l… | e2e-test | verified | test_us_016_personalised_training.py |
+| AC-076 | The profile page asks for current fitness and shows your zon… | e2e-test | verified | test_us_016_personalised_training.py |
 
-Progress: 43/70 verified — v0 (AC-001–AC-027, AC-055–AC-070) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+Progress: 49/76 verified — v0 (AC-001–AC-027, AC-055–AC-076) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
 
 GitHub issue: not created — no repository linked to this session.

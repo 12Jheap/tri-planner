@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "_session.html" import full with context %}
+{% block title %}{{ c.s.title }} · tri-planner{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ c.p.slot.on.strftime('%A %d %B') }}</div>
+    <h1>{{ c.s.title }}</h1>
+  </div>
+  <a class="btn" href="{{ url_for('week_view', w=week) }}">Week</a>
+</div>
+{{ full(c, url_for('session_detail', week=week, sid=c.s.id), detail=True) }}
+{% if c.s.discipline in ('run', 'bike', 'swim') and c.s.discipline not in known and not ('hr' in known and c.s.discipline != 'swim') %}
+  <p class="small muted">Targets are by feel because there are no {{ {'run': '5k', 'bike': 'FTP or heart-rate', 'swim': 'CSS'}[c.s.discipline] }} numbers yet.
+    <a href="{{ url_for('setup') }}#fitness">Add them</a> for paces and zones.</p>
+{% endif %}
+{% endblock %}

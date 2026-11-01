@@ -18,6 +18,7 @@ import yaml
 
 from planner.config import DAYS, ConfigError, Facility, parse_config
 from planner.friendly import parse_time
+from planner.profile import Profile
 from planner.targets import DEFAULT_HOURS
 
 Ask = Callable[[str], str]
@@ -183,10 +184,36 @@ def run_wizard(ask: Ask, say: Say) -> dict[str, Any]:
             raise ValueError("pick something between 1 and 30")
         return h
 
-    weekly_hours = _ask_until_ok(
-        ask, say,
-        f"Hours a week you want to train, in a normal week [{default_h:g}]: ", hours,
+    current_hours = _ask_until_ok(
+        ask, say, f"Hours a week you train now, roughly [{default_h:g}]: ", hours,
     )
+
+    say("\nYour current fitness: each number gives you real paces, watts and heart rates.\n"
+        "All optional; press Enter to skip any of them.")
+    profile: dict[str, Any] = {"current_hours": current_hours}
+
+    def field(prompt: str, key: str, kind: str) -> None:
+        def parse(t: str) -> Any:
+            t = t.strip()
+            if not t:
+                return None
+            value: Any = t if kind == "time" else int(t)
+            Profile(**{key: value})  # same checks as the config file
+            return value
+        value = _ask_until_ok(ask, say, prompt, parse)
+        if value is not None:
+            profile[key] = value
+
+    field("Recent 5k time, e.g. 21:30: ", "run_5k", "time")
+    field("Swim CSS per 100m, e.g. 1:45 (Enter if you don't know): ", "swim_css", "time")
+    if "swim_css" not in profile:
+        field("  400m time-trial time, e.g. 7:20: ", "swim_400", "time")
+        if "swim_400" in profile:
+            field("  200m time-trial time, e.g. 3:25: ", "swim_200", "time")
+    field("Bike FTP in watts (Enter if no power meter): ", "ftp", "int")
+    field("Threshold heart rate, bpm (Enter to skip): ", "threshold_hr", "int")
+    if "threshold_hr" not in profile:
+        field("Max heart rate, bpm (Enter to skip): ", "max_hr", "int")
 
     say("\nWhere do you train? Add each place: home, school, work, the gym…")
     menu = "\n".join(f"  {i}. {FACILITY_NAMES[f]}" for i, f in enumerate(FACILITIES, 1))
@@ -233,7 +260,7 @@ def run_wizard(ask: Ask, say: Say) -> dict[str, Any]:
     if race_date:
         config["race_date"] = race_date
     config |= {
-        "weekly_hours": weekly_hours,
+        "profile": profile,
         "locations": locations,
         "templates": {"normal": {"slots": slots}},
         "default_template": "normal",

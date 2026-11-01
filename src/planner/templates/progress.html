@@ -1,56 +1,58 @@
 {% extends "base.html" %}
 {% block title %}Progress · tri-planner{% endblock %}
+{% block main_class %}narrow{% endblock %}
 {% block body %}
-<h1>Progress</h1>
-<p class="muted">The one number that matters: how much of the plan you actually did.</p>
+<div class="head"><div><div class="eyebrow">Completed ÷ planned</div><h1>Progress</h1></div></div>
 
 {% if not weeks %}
-  <div class="panel empty"><div class="big">📈</div><p>Plan a week and log a few sessions to see this fill in.</p></div>
+  <div class="empty"><h3>Nothing to show yet</h3><p class="muted">Plan a week and log a few sessions.</p></div>
 {% else %}
-<div class="panel">
-  <h2 style="margin-top:0">By week</h2>
+  {% set latest = weeks[0] %}
+  <div class="stats">
+    <div class="stat"><div class="v tnum">{{ (latest.ratio * 100)|round|int }}%</div><div class="k">week of {{ latest.week.strftime('%d %b') }}</div></div>
+    <div class="stat"><div class="v tnum">{{ weeks|selectattr('ratio', 'ge', 0.5)|list|length }}/{{ weeks|length }}</div><div class="k">weeks at 50% or more</div></div>
+  </div>
+
+  <h2>By week</h2>
+  <div class="bars">
   {% for s in weeks %}
-    <div style="margin:12px 0">
-      <div style="display:flex;justify-content:space-between"><strong>{{ s.week.strftime('%d %b') }}</strong>
-        <span>{{ (s.ratio * 100)|round|int }}%</span></div>
-      <div class="bar"><span style="width: {{ [s.ratio * 100, 100]|min }}%; {{ 'background: var(--muted)' if s.low_response }}"></span></div>
-      <p class="small muted">{{ fmt_min(s.completed_min) }} of {{ fmt_min(s.planned_min) }} · {{ s.logged }}/{{ s.sessions }} logged
-        {% if s.low_response %}· under 70% logged, so treat this with caution{% endif %}</p>
+    <div class="b">
+      <span class="muted">{{ s.week.strftime('%d %b') }}</span>
+      <div class="track"><i class="{{ 'weak' if s.low_response }}" style="width: {{ [s.ratio * 100, 100]|min }}%"></i></div>
+      <span style="text-align:right">{{ (s.ratio * 100)|round|int }}%</span>
+    </div>
+    <div class="small muted" style="margin:-6px 0 4px 82px">{{ fmt_min(s.completed_min) }} of {{ fmt_min(s.planned_min) }} · {{ s.logged }}/{{ s.sessions }} logged{% if s.low_response %} · under 70% logged, so read with caution{% endif %}</div>
+  {% endfor %}
+  </div>
+  <p class="small muted">Target: 50% or more for 6 weeks in a row.</p>
+
+  <h2>By sport</h2>
+  <div class="bars">
+  {% for sport, r in by_sport.items()|sort %}
+    <div class="b">
+      <span class="sport s-{{ sport }}" style="font-size:12px">{{ sport }}</span>
+      <div class="track"><i style="width: {{ [r * 100, 100]|min }}%"></i></div>
+      <span style="text-align:right">{{ (r * 100)|round|int }}%</span>
     </div>
   {% endfor %}
-  <p class="small muted">Goal: 50% or more for 6 weeks in a row.</p>
-</div>
+  </div>
 
-<div class="panel">
-  <h2 style="margin-top:0">By sport</h2>
-  <table>
-    {% for sport, r in by_sport.items()|sort %}
-      <tr><td>{{ icon.get(sport, '') }} {{ sport|title }}</td><td class="num">{{ (r * 100)|round|int }}%</td></tr>
-    {% endfor %}
-  </table>
-</div>
-
-{% if slots %}
-<div class="panel">
-  <h2 style="margin-top:0">Which slots really work</h2>
-  <p class="small muted">The chance you train when a session's in that slot, learned from your log. The planner moves Key sessions towards the top of this list.</p>
-  <table>
-    <tr><th>Slot</th><th class="num">Chance</th><th class="num">Logged</th></tr>
+  {% if slots %}
+  <h2>Which slots work</h2>
+  <p class="small muted" style="max-width:60ch">Chance you train when a session's in that slot, learned from your log. Key sessions drift towards the top of this list.</p>
+  <table class="data">
+    <tr><th>Slot</th><th style="text-align:right">Chance</th><th style="text-align:right">Logged</th></tr>
     {% for s in slots %}
-      <tr><td>{{ label(s.key) }}</td><td class="num">{{ (s.p * 100)|round|int }}%</td><td class="num">{{ s.n }}</td></tr>
+      <tr><td>{{ label(s.key) }}</td><td class="num" style="text-align:right">{{ (s.p * 100)|round|int }}%</td><td class="num" style="text-align:right">{{ s.n }}</td></tr>
     {% endfor %}
   </table>
-</div>
-{% endif %}
+  {% endif %}
 
-{% if by_type|length > 1 %}
-<div class="panel">
-  <h2 style="margin-top:0">The experiment</h2>
-  <p>Facility-aware weeks: <strong>{{ (by_type.get('facility_aware', 0) * 100)|round|int }}%</strong>
-   · time-only weeks: <strong>{{ (by_type.get('time_only', 0) * 100)|round|int }}%</strong></p>
+  {% if by_type|length > 1 %}
+  <h2>The experiment</h2>
   {% set diff = (by_type.get('facility_aware', 0) - by_type.get('time_only', 0)) * 100 %}
-  <p class="muted">{{ 'Facility-awareness is helping' if diff >= 10 else 'No clear uplift yet (target: 10 points or more)' }}.</p>
-</div>
-{% endif %}
+  <p>Facility-aware weeks <b class="tnum">{{ (by_type.get('facility_aware', 0) * 100)|round|int }}%</b> · time-only weeks <b class="tnum">{{ (by_type.get('time_only', 0) * 100)|round|int }}%</b></p>
+  <p class="muted">{{ 'Facility-awareness is helping.' if diff >= 10 else 'No clear uplift yet (target: 10 points or more).' }}</p>
+  {% endif %}
 {% endif %}
 {% endblock %}

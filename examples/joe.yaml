@@ -3,8 +3,15 @@
 athlete: Joe
 race: sprint
 race_date: 2027-06-27
-weekly_hours: 8            # base-phase target; build adds ~10%, taper cuts ~40%
 timezone: Europe/London
+
+# Current fitness: all optional. Each number turns "by feel" into paces/watts/HR.
+profile:
+  current_hours: 8         # what you train now; volume ramps ~10%/week from here
+  # run_5k: "20:30"        # recent 5k time
+  # swim_css: "1:45"       # per 100m (or swim_400 + swim_200 time-trial times)
+  # ftp: 220               # watts
+  # threshold_hr: 180      # or max_hr: 200
 
 locations:
   - name: School

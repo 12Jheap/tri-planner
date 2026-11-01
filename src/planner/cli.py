@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 from planner.adherence import REASONS, LogRow, read_log
 from planner.config import AthleteConfig, ConfigError
 from planner.friendly import parse_injury, parse_week
+from planner.profile import Profile
 from planner.report import weekly_report
 from planner.service import (
     PlannerError,
@@ -37,6 +38,7 @@ from planner.sessions import how_to
 from planner.solver import Placement
 from planner.targets import describe_targets
 from planner.wizard import run_wizard, to_yaml
+from planner.workouts import workout_for
 
 DEFAULT_CONFIG = "athlete.yaml"
 Ask = Callable[[str], str]
@@ -73,7 +75,7 @@ def cmd_week(a: argparse.Namespace) -> int:
     res = ws.plan_week(_week(a, ws, "next"), a.phase, ramp=a.ramp,
                        prev_minutes=a.prev_minutes, experiment_start=a.experiment_start)
     title = f"Week of {res.week:%d %b %Y} — {res.phase}, {res.week_type.replace('_', '-')}"
-    print(plan_markdown(res.plan, f"{title} (v{res.version})"))
+    print(plan_markdown(res.plan, f"{title} (v{res.version})", profile=ws.cfg.profile))
     for n in res.notes:
         print(f"• {n}")
     print(f"\nTargets: {describe_targets(res.targets)}  |  free time: {res.available_min / 60:.1f}h")
@@ -89,15 +91,16 @@ def cmd_show(a: argparse.Namespace) -> int:
     ws = _ws(a)
     week = _week(a, ws, "this")
     plan = ws.require_plan(week)
-    print(plan_markdown(plan, f"Week of {week:%d %b %Y}", ws.log_index(week)))
+    print(plan_markdown(plan, f"Week of {week:%d %b %Y}", ws.log_index(week), ws.cfg.profile))
     return 0
 
 
-def _today_line(p: Placement, row: LogRow | None) -> str:
+def _today_line(p: Placement, row: LogRow | None, profile: Profile) -> str:
     done = status_text(row)
+    steps = "\n".join(f"      · {b.summary()}" for b in workout_for(p.session, profile).blocks)
     return (
         f"  {p.start:%H:%M}–{p.end:%H:%M}  {p.slot.location:<12} {p.session.label}"
-        f"{'   ' + done if done else ''}\n      {how_to(p.session)}"
+        f"{'   ' + done if done else ''}\n      {how_to(p.session)}\n{steps}"
     )
 
 
@@ -112,7 +115,7 @@ def cmd_today(a: argparse.Namespace) -> int:
     if not todays:
         print("  Rest day. Nothing planned.")
     for p in todays:
-        print(_today_line(p, log.get(p.session.id)))
+        print(_today_line(p, log.get(p.session.id), ws.cfg.profile))
     nxt = next((p for p in plan.placements if p.slot.on and p.slot.on > day), None)
     if nxt:
         print(f"\nNext: {nxt.slot.on:%a} {nxt.start:%H:%M} {nxt.session.label} @ {nxt.slot.location}")
@@ -199,7 +202,8 @@ def cmd_replan(a: argparse.Namespace) -> int:
         to = slot_label(m.to_slot) if m.to_slot else "dropped"
         print(f"  {m.session_id}: {slot_label(m.from_slot)} → {to}  ({m.reason.replace('_', ' ')})")
     title = f"Week of {week:%d %b %Y} — re-plan (v{res.version})"
-    print(f"\n{plan_markdown(res.plan, title, ws.log_index(week))}\n\n{res.log_summary}")
+    md = plan_markdown(res.plan, title, ws.log_index(week), ws.cfg.profile)
+    print(f"\n{md}\n\n{res.log_summary}")
     return 0
 
 

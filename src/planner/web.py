@@ -34,30 +34,35 @@ from werkzeug.wrappers import Response
 from planner.adherence import AdherenceModel, LogRow, weekly_summaries
 from planner.config import DAYS, ConfigError, Facility, parse_config, week_start
 from planner.friendly import parse_injury
+from planner.profile import ZONE_NAMES, mmss
 from planner.report import completion_by
 from planner.service import PlannerError, Workspace, placements_on, slot_label
 from planner.sessions import how_to
 from planner.solver import Placement, slot_uid
-from planner.targets import DEFAULT_HOURS, describe_targets, phase_for
+from planner.targets import DEFAULT_HOURS, is_recovery_week, phase_for
 from planner.wizard import FACILITY_NAMES, parse_windows, to_yaml
+from planner.workouts import workout_for
 
 HERE = Path(__file__).parent
-SPORT_ICON = {"swim": "🏊", "bike": "🚴", "run": "🏃", "strength": "💪"}
+SPORTS = ("swim", "bike", "run", "strength")
 REASON_TEXT = {
     "no_time": "No time", "facility_closed": "Facility closed", "body": "Body said no",
     "feeling_off": "Feeling off", "other": "Other",
 }
 WINDOWED = (Facility.POOL, Facility.OPEN_WATER, Facility.GYM)
+PROFILE_TIMES = ("run_5k", "swim_css", "swim_400", "swim_200")
+PROFILE_NUMBERS = ("current_hours", "ftp", "threshold_hr", "max_hr")
 
 
 def _nice(s: Any) -> str:
-    """'Bike long · 1h25' instead of "Bike long 85' [KEY]"."""
-    kind = "" if s.kind == s.discipline else " " + s.kind.replace("_", " ")
-    return f"{s.discipline.title()}{kind} · {_fmt_min(s.duration_min)}"
+    """'Threshold run · 45 min'."""
+    return f"{s.title} · {_fmt_min(s.duration_min)}"
 
 
 def _fmt_min(m: int) -> str:
-    return f"{m // 60}h{m % 60:02d}" if m >= 60 else f"{m} min"
+    if m < 60:
+        return f"{m} min"
+    return f"{m // 60}h" if m % 60 == 0 else f"{m // 60}h{m % 60:02d}"
 
 
 def _windows_text(windows: list[Any]) -> str:
@@ -67,6 +72,12 @@ def _windows_text(windows: list[Any]) -> str:
         days = ",".join(w.days) if w.days else ""
         parts.append(f"{days} {w.start:%H:%M}-{w.end:%H:%M}".strip())
     return "; ".join(parts)
+
+
+def _dur(seconds: int) -> str:
+    if seconds < 60:
+        return f"{seconds}s"
+    return f"{seconds // 60}:{seconds % 60:02d}" if seconds % 60 else f"{seconds // 60} min"
 
 
 def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flask:
@@ -91,8 +102,9 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
     @app.context_processor
     def _globals() -> dict[str, Any]:
         return {
-            "token": token, "icon": SPORT_ICON, "how_to": how_to, "fmt_min": _fmt_min, "nice": _nice,
-            "reasons": REASON_TEXT, "nav": request.endpoint,
+            "token": token, "how_to": how_to, "fmt_min": _fmt_min, "nice": _nice,
+            "reasons": REASON_TEXT, "nav": request.endpoint, "zone_names": ZONE_NAMES,
+            "mmss": mmss, "dur": _dur,
         }
 
     @app.before_request
@@ -115,16 +127,19 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
     # ---- helpers ----------------------------------------------------------------------
     def card(p: Placement, log: dict[str, LogRow], today: date) -> dict[str, Any]:
         row = log.get(p.session.id)
+        workout = workout_for(p.session, ws.cfg.profile)
+        total = max(1, workout.seconds)
         return {
-            "p": p, "row": row if row and row.logged else None,
+            "p": p, "s": p.session, "row": row if row and row.logged else None,
             "loggable": p.slot.on is not None and p.slot.on <= today,
             "week": week_start(p.slot.on) if p.slot.on else None,
+            "workout": workout,
+            "segments": [(z, 100 * secs / total) for z, secs in workout.segments()],
         }
 
     def banners(day: date) -> list[str]:
-        out = [f"{SPORT_ICON.get(i.discipline, '')} {i.discipline.title()} paused until "
-               f"{i.until:%a %d %b} (injury)." for i in ws.injuries().active(day)]
-        return out
+        return [f"{i.discipline.title()} paused until {i.until:%a %d %b} (injury)."
+                for i in ws.injuries().active(day)]
 
     # ---- pages ------------------------------------------------------------------------
     @app.get("/")
@@ -160,28 +175,48 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
         for i, name in enumerate(DAYS):
             d = week + timedelta(days=i)
             items = [card(p, log, now_.date()) for p in placements_on(plan, d)] if plan else []
-            days.append({"date": d, "name": name, "items": items, "today": d == now_.date()})
+            days.append({"date": d, "name": name, "items": items, "today": d == now_.date(),
+                         "past": d < now_.date()})
         wk_dir = ws.out / str(week)
+        totals = {sp: sum(p.session.duration_min for p in plan.placements
+                          if p.session.discipline == sp) for sp in SPORTS} if plan else {}
+        race = ws.cfg.race_date
         return render_template(
             "week.html", week=week, plan=plan, days=days, summary=ws.summary(week),
             prev=week - timedelta(days=7), next=week + timedelta(days=7),
-            this_week=week_start(now_.date()), phase=phase_for(week, ws.cfg.race_date),
+            this_week=week_start(now_.date()), phase=phase_for(week, race),
+            recovery=is_recovery_week(week, race) and phase_for(week, race) != "taper",
+            race_in_week=race if race and week <= race < week + timedelta(days=7) else None,
             has_files=(wk_dir / "plan.ics").exists(), banners=banners(week),
             fits=len(list(wk_dir.glob("*.fit"))) if wk_dir.exists() else 0,
-            hours=ws.cfg.weekly_hours or DEFAULT_HOURS[ws.cfg.race],
+            hours=ws.cfg.profile.current_hours or DEFAULT_HOURS[ws.cfg.race], totals=totals,
+            weeks_to_race=(race - week).days // 7 if race and race >= week else None,
         )
+
+    @app.get("/s/<week>/<sid>")
+    def session_detail(week: str, sid: str) -> str:
+        wk = week_start(date.fromisoformat(week))
+        plan = ws.require_plan(wk)
+        p = plan.placement(sid)
+        if p is None:
+            abort(404)
+        assert p is not None
+        c = card(p, ws.log_index(wk), clock().date())
+        return render_template("session.html", c=c, week=wk,
+                               known=ws.cfg.profile.known)
 
     @app.post("/week/plan")
     def plan_week() -> Response:
         week = week_start(date.fromisoformat(request.form["week"]))
         phase = request.form.get("phase") or None
         res = ws.plan_week(week, phase)  # type: ignore[arg-type]
-        flash(f"Planned {res.plan.planned_minutes / 60:.1f}h for the week of {week:%d %b} "
-              f"({res.phase}): {describe_targets(res.targets)}", "ok")
+        flash(f"Planned {len(res.plan.placements)} sessions, "
+              f"{_fmt_min(res.plan.planned_minutes)} in total.", "ok")
         for n in res.notes:
             flash(n, "info")
         if res.plan.dropped:
-            flash("Didn't fit: " + ", ".join(s.id for s in res.plan.dropped), "info")
+            flash("Left out for lack of room: " + ", ".join(
+                _nice(s) for s in res.plan.dropped) + ".", "info")
         return redirect(url_for("week_view", w=week))
 
     @app.post("/log")
@@ -191,10 +226,10 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
         action = f["action"]
         if action == "undo":
             ws.log_session(week, f["session"], None)
-            flash("Cleared. Log it again when you're ready.", "info")
+            flash("Entry cleared.", "info")
         elif action == "skipped":
             ws.log_session(week, f["session"], "skipped", reason=f.get("reason") or "other")
-            flash("Logged as skipped. That's useful data too.", "ok")
+            flash("Logged as skipped.", "ok")
         else:
             mins = f.get("minutes", "").strip()
             if mins and not mins.isdigit():
@@ -202,10 +237,10 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
             status = "moved" if f.get("other_time") else "done"
             row = ws.log_session(week, f["session"], status,  # type: ignore[arg-type]
                                  minutes=int(mins) if mins else None, pain=bool(f.get("pain")))
-            flash(f"Nice. {row.actual_min} min logged.", "ok")
+            flash(f"Logged {row.actual_min} min.", "ok")
             if row.pain:
-                flash("Something hurt. If it happens twice in a row, that sport pauses "
-                      "and you'll be told to see a physio.", "info")
+                flash("Pain noted. Two sessions in a row with pain pauses that sport until "
+                      "a physio clears you.", "info")
         return redirect(f.get("next") or url_for("today"))
 
     @app.get("/replan")
@@ -244,7 +279,10 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
                   "to": slot_label(m.to_slot) if m.to_slot else "dropped",
                   "why": m.reason.replace("_", " ")} for m in res.moves]
         labels = {p.session.id: _nice(p.session) for p in res.plan.placements}
-        sports = {p.session.id: p.session.discipline for p in res.plan.placements}
+        sports: dict[str, str] = {p.session.id: p.session.discipline
+                                  for p in res.plan.placements}
+        for m in res.moves:  # dropped sessions aren't in the new plan
+            sports.setdefault(m.session_id, m.session_id.split("-")[0])
         return render_template("replan_done.html", res=res, moves=moves, labels=labels,
                                sports=sports)
 
@@ -291,14 +329,18 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
         cfg = ws.cfg if configured() else None
         raw_text = ws.config_path.read_text("utf-8") if ws.config_path.exists() else ""
         form: dict[str, Any] = {"athlete": "", "race": "sprint", "race_date": "",
-                                "weekly_hours": "", "locations": [], "slots": {},
+                                "profile": {}, "locations": [], "slots": {},
                                 "overrides": [], "templates": []}
         if cfg:
             tmpl = cfg.templates[cfg.default_template]
+            prof = cfg.profile
             form = {
                 "athlete": cfg.athlete, "race": cfg.race,
                 "race_date": cfg.race_date.isoformat() if cfg.race_date else "",
-                "weekly_hours": f"{cfg.weekly_hours:g}" if cfg.weekly_hours else "",
+                "profile": {
+                    **{k: mmss(v) for k in PROFILE_TIMES if (v := getattr(prof, k))},
+                    **{k: f"{v:g}" for k in PROFILE_NUMBERS if (v := getattr(prof, k))},
+                },
                 "locations": [
                     {"name": loc.name, "kit": {f.name.value for f in loc.facilities},
                      "hours": {f.name.value: _windows_text(f.windows) for f in loc.facilities}}
@@ -311,7 +353,8 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
         return render_template(
             "setup.html", form=form, days=DAYS, facilities=FACILITY_NAMES, windowed=WINDOWED,
             raw_text=raw_text, show_raw=bool(request.args.get("raw")), first=cfg is None,
-            default_hours=DEFAULT_HOURS,
+            default_hours=DEFAULT_HOURS, zones=cfg.profile.table() if cfg else [],
+            known=cfg.profile.known if cfg else [],
         )
 
     def _form_to_config(f: Any) -> dict[str, Any]:
@@ -321,9 +364,18 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None) -> Flas
         data.pop("race_date", None)
         if f.get("race_date"):
             data["race_date"] = date.fromisoformat(f["race_date"])
-        data.pop("weekly_hours", None)
-        if f.get("weekly_hours", "").strip():
-            data["weekly_hours"] = float(f["weekly_hours"])
+        data.pop("weekly_hours", None)  # now profile.current_hours
+        profile: dict[str, Any] = {}
+        for k in PROFILE_TIMES:
+            if v := f.get(f"p-{k}", "").strip():
+                profile[k] = v
+        for k in PROFILE_NUMBERS:
+            if v := f.get(f"p-{k}", "").strip():
+                try:
+                    profile[k] = float(v) if k == "current_hours" else int(v)
+                except ValueError:
+                    raise ValueError(f"{k.replace('_', ' ')} should be a number") from None
+        data["profile"] = profile
         data.setdefault("timezone", "Europe/London")
 
         locations = []

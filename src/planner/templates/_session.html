@@ -1,67 +1,111 @@
-{% macro session(c, next, compact=False) %}
-{% set p = c.p %}{% set s = p.session %}{% set row = c.row %}
-<article class="session sport-{{ s.discipline }}{{ ' compact' if compact }}{{ ' logged-' ~ row.status if row }}" id="s-{{ s.id }}">
-  <div class="session-head">
-    <span class="sport" aria-hidden="true">{{ icon[s.discipline] }}</span>
-    <div class="title">
-      <h3>{{ s.discipline|title }}{{ ' ' ~ s.kind|replace('_', ' ') if s.kind != s.discipline }}
-        <span class="dur">· {{ fmt_min(s.duration_min) }}</span></h3>
-      <p class="meta">{{ p.start.strftime('%H:%M') }}–{{ p.end.strftime('%H:%M') }} · {{ p.slot.location }}</p>
-    </div>
-    {% if s.key %}<span class="badge" title="Key sessions are protected when the week changes">Key</span>{% endif %}
-  </div>
-  {% if not compact %}
-    <p class="how">{{ how_to(s) }}</p>
-    <p class="effort">Effort <span class="dots" aria-label="{{ s.intensity }} out of 5">{{ '●' * s.intensity }}{{ '○' * (5 - s.intensity) }}</span>
-      {{ {1: 'very easy', 2: 'easy, chatty', 3: 'steady, short sentences', 4: 'hard, a few words', 5: 'flat out'}[s.intensity] }}</p>
-  {% endif %}
-  {% if p.reason %}<p class="moved">Moved: {{ p.reason|replace('_', ' ') }}</p>{% endif %}
-  {% if not p.facility_ok %}<p class="moved">⚠ Time-only test week: the kit may not be here.</p>{% endif %}
+{% macro timeline(c, slim=False) %}
+<div class="timeline{{ ' slim' if slim }}" role="img" aria-label="Workout shape by training zone">
+  {%- for z, pct in c.segments %}<i class="z-{{ z }}" style="width:{{ '%.2f'|format(pct) }}%" title="{{ zone_names[z] }}"></i>{% endfor -%}
+</div>
+{% endmacro %}
 
-  {% if row %}
-    <form method="post" action="{{ url_for('log') }}" class="status {{ 'done' if row.status in ('done', 'moved') else 'skipped' }}">
-      <span>
-        {% if row.status in ('done', 'moved') %}✓ Done · {{ row.actual_min }} min{{ ' (another time)' if row.status == 'moved' }}{{ ' · hurt' if row.pain }}
-        {% else %}✗ Skipped · {{ reasons.get(row.reason, row.reason) }}{% endif %}
-      </span>
-      <input type="hidden" name="token" value="{{ token }}">
-      <input type="hidden" name="week" value="{{ c.week }}">
-      <input type="hidden" name="session" value="{{ s.id }}">
-      <input type="hidden" name="next" value="{{ next }}#s-{{ s.id }}">
-      <button class="ghost" name="action" value="undo">Undo</button>
-    </form>
-  {% elif c.loggable %}
-    <div class="log-actions">
-      <details>
-        <summary class="btn primary">✓ Done it</summary>
-        <form method="post" action="{{ url_for('log') }}" class="log-form">
-          <input type="hidden" name="token" value="{{ token }}">
-          <input type="hidden" name="week" value="{{ c.week }}">
-          <input type="hidden" name="session" value="{{ s.id }}">
-          <input type="hidden" name="next" value="{{ next }}#s-{{ s.id }}">
-          <label>Minutes
-            <input type="number" name="minutes" min="0" max="600" inputmode="numeric" value="{{ s.duration_min }}">
-          </label>
-          <label class="check"><input type="checkbox" name="pain" value="1"> Something hurt</label>
-          <label class="check"><input type="checkbox" name="other_time" value="1"> I did it at a different time</label>
-          <button class="primary" name="action" value="done">Save</button>
-        </form>
-      </details>
-      <details>
-        <summary class="btn">Skipped</summary>
-        <form method="post" action="{{ url_for('log') }}" class="log-form">
-          <input type="hidden" name="token" value="{{ token }}">
-          <input type="hidden" name="week" value="{{ c.week }}">
-          <input type="hidden" name="session" value="{{ s.id }}">
-          <input type="hidden" name="next" value="{{ next }}#s-{{ s.id }}">
-          <input type="hidden" name="action" value="skipped">
-          <span class="small muted">Why? One tap:</span>
-          <div class="pills">
-            {% for key, text in reasons.items() %}<button name="reason" value="{{ key }}">{{ text }}</button>{% endfor %}
-          </div>
-        </form>
-      </details>
-    </div>
-  {% endif %}
+{% macro legend(c) %}
+<div class="legend">{% for z in c.workout.zones_used %}<span><i class="z-{{ z }}"></i>{{ zone_names[z] }}</span>{% endfor %}</div>
+{% endmacro %}
+
+{% macro steps(c) %}
+<table class="steps">
+  {% for b in c.workout.blocks %}
+    {% set work = b.steps[0] %}
+    <tr>
+      <td class="reps">{{ (b.reps ~ '×') if b.reps > 1 }}</td>
+      <td class="dur">{{ (work.metres ~ 'm') if work.metres else dur(work.seconds) }}</td>
+      <td class="what"><span class="zdot z-{{ work.zone }}"></span>{{ work.label }}
+        {% if work.note %}<div class="note">{{ work.note }}</div>{% endif %}</td>
+      <td class="tgt">{{ work.target if work.zone not in ('recovery',) }}</td>
+    </tr>
+    {% for r in b.steps[1:] %}
+      <tr class="rest">
+        <td></td>
+        <td class="dur">{{ dur(r.seconds) }}</td>
+        <td class="what">{{ r.label }}{{ ' between reps' if b.reps > 1 and r.label == 'rest' }}</td>
+        <td class="tgt"></td>
+      </tr>
+    {% endfor %}
+  {% endfor %}
+</table>
+{% endmacro %}
+
+{% macro log_controls(c, next) %}
+{% set s = c.s %}{% set row = c.row %}
+{% if row %}
+  <form method="post" action="{{ url_for('log') }}" class="log logged {{ 'done' if row.status in ('done', 'moved') else 'skipped' }}">
+    <span>
+      {% if row.status in ('done', 'moved') %}Done · {{ row.actual_min }} min{{ ' · another time' if row.status == 'moved' }}{{ ' · pain noted' if row.pain }}
+      {% else %}Skipped · {{ reasons.get(row.reason, row.reason) }}{% endif %}
+    </span>
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="week" value="{{ c.week }}">
+    <input type="hidden" name="session" value="{{ s.id }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="quiet" name="action" value="undo">Undo</button>
+  </form>
+{% elif c.loggable %}
+  <div class="log row">
+    <details>
+      <summary class="btn primary">Mark done</summary>
+      <form method="post" action="{{ url_for('log') }}" class="panel">
+        <input type="hidden" name="token" value="{{ token }}">
+        <input type="hidden" name="week" value="{{ c.week }}">
+        <input type="hidden" name="session" value="{{ s.id }}">
+        <input type="hidden" name="next" value="{{ next }}">
+        <label>Minutes done
+          <input type="number" name="minutes" min="0" max="600" inputmode="numeric" value="{{ s.duration_min }}">
+        </label>
+        <label class="check"><input type="checkbox" name="pain" value="1"> Something hurt</label>
+        <label class="check"><input type="checkbox" name="other_time" value="1"> Did it at a different time</label>
+        <div><button class="primary" name="action" value="done">Save</button></div>
+      </form>
+    </details>
+    <details>
+      <summary class="btn">Skipped</summary>
+      <form method="post" action="{{ url_for('log') }}" class="panel">
+        <input type="hidden" name="token" value="{{ token }}">
+        <input type="hidden" name="week" value="{{ c.week }}">
+        <input type="hidden" name="session" value="{{ s.id }}">
+        <input type="hidden" name="next" value="{{ next }}">
+        <input type="hidden" name="action" value="skipped">
+        <span class="small muted">What got in the way?</span>
+        <div class="reasons">
+          {% for key, text in reasons.items() %}<button name="reason" value="{{ key }}">{{ text }}</button>{% endfor %}
+        </div>
+      </form>
+    </details>
+  </div>
+{% endif %}
+{% endmacro %}
+
+{% macro full(c, next, detail=False) %}
+{% set p = c.p %}{% set s = c.s %}
+<article class="card{{ ' done' if c.row }}" id="s-{{ s.id }}">
+  <div class="top-row">
+    <span class="sport s-{{ s.discipline }}">{{ s.discipline }}</span>
+    {% if s.key %}<span class="key" title="Key sessions are protected when the week changes">Key</span>{% endif %}
+  </div>
+  {% if not detail %}<h3><a href="{{ url_for('session_detail', week=c.week, sid=s.id) }}">{{ s.title }}</a></h3>{% endif %}
+  <div class="meta tnum">{{ p.start.strftime('%H:%M') }}–{{ p.end.strftime('%H:%M') }} · {{ p.slot.location }} · {{ fmt_min(s.duration_min) }}{% if c.workout.metres %} · {{ '{:,}'.format(c.workout.metres) }}m{% endif %}</div>
+  {% if p.reason %}<div class="meta">Moved: {{ p.reason|replace('_', ' ') }}</div>{% endif %}
+  {% if not p.facility_ok %}<div class="meta">Time-only test week: the kit may not be here.</div>{% endif %}
+  <p class="why">{{ how_to(s) }}</p>
+  {{ timeline(c) }}
+  {{ legend(c) }}
+  {{ steps(c) }}
+  {{ log_controls(c, next ~ '#s-' ~ s.id) }}
 </article>
+{% endmacro %}
+
+{% macro block(c) %}
+{% set p = c.p %}{% set s = c.s %}
+<a class="blk s-{{ s.discipline }}{{ ' done' if c.row }}" href="{{ url_for('session_detail', week=c.week, sid=s.id) }}">
+  <div class="t">{{ s.title }}</div>
+  <div class="m">{{ p.start.strftime('%H:%M') }} · {{ fmt_min(s.duration_min) }}{{ ' · key' if s.key }}</div>
+  <div class="m">{{ p.slot.location }}</div>
+  {{ timeline(c, slim=True) }}
+  {% if c.row %}<div class="st {{ 'done' if c.row.status in ('done', 'moved') else 'skipped' }}">{{ 'Done' if c.row.status in ('done', 'moved') else 'Skipped' }}</div>{% endif %}
+</a>
 {% endmacro %}

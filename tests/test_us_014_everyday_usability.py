@@ -29,7 +29,7 @@ def _answers(*lines: str):
 
 
 def test_ac_055_weekly_volume_comes_from_target_hours_not_free_time():
-    """AC-055 [unit-test]: Weekly volume comes from the athlete's target hours; free time is only a ceiling (build +10%, taper −40%)"""
+    """AC-055 [unit-test]: Weekly volume starts from what the athlete trains now and ramps from what they actually did; free time is only a ceiling (build +10%, taper −40%)"""
     lots_free = weekly_targets("sprint", "base", available_minutes=1800, weekly_hours=7)
     assert sum(lots_free.values()) <= 420  # 30h free still means a 7h week
     little_free = weekly_targets("sprint", "base", available_minutes=300, weekly_hours=7)
@@ -49,11 +49,12 @@ def test_ac_056_no_session_is_longer_than_its_race_appropriate_cap():
             targets = weekly_targets(race, phase, available_minutes=3000)  # huge week
             for s in build_week_sessions(targets, race, phase):  # type: ignore[arg-type]
                 if s.discipline == "strength":
-                    assert s.duration_min <= 45
+                    assert s.duration_min <= 45 and s.max_min == 45
                     continue
-                assert s.duration_min <= CAPS[race][s.discipline][s.kind], s
+                cap = CAPS[race][s.discipline][s.kind]
+                assert s.duration_min <= cap and s.max_min == cap, s  # filling can't pass it
     sprint = build_week_sessions(weekly_targets("sprint", "base", 3000), "sprint", "base")
-    assert next(s for s in sprint if s.id == "run-long").duration_min == 60
+    assert next(s for s in sprint if s.id == "run-long").max_min == 60
 
 
 def test_ac_057_key_session_too_long_for_every_slot_is_shortened_not_infeasible(monday):
@@ -66,7 +67,9 @@ def test_ac_057_key_session_too_long_for_every_slot_is_shortened_not_infeasible(
     )
     slots = calendar_for_week(cfg, monday)
     long_ride = make_session("bike-long", "bike", 120)
-    assert plan_week([long_ride], slots, cfg).status == "infeasible"  # the old behaviour
+    direct = plan_week([long_ride], slots, cfg)  # the solver now does this itself
+    assert direct.status != "infeasible" and direct.placements[0].session.duration_min == 90
+    assert direct.notes and "120' → 90'" in direct.notes[0]
     fitted, notes = fit_to_slots([long_ride], slots, cfg)
     assert fitted[0].duration_min == 90 and fitted[0].id == "bike-long"
     assert fitted[0].value < long_ride.value  # value recomputed for the shorter session
@@ -151,6 +154,7 @@ def test_ac_060_init_wizard_builds_a_valid_config_from_plain_answers(tmp_path):
     """AC-060 [unit-test]: `init` builds a valid config from plain answers (no YAML knowledge), and unquoted YAML times like 6:30 load as 06:30"""
     ask = _answers(
         "Sam", "olympic", "2027-07-04", "",  # name, race, date, default hours
+        "21:30", "1:45", "abc", "210", "", "",  # 5k, CSS, bad FTP, FTP, no HR
         "Home", "3,5",  # road bike + run outside
         "Leisure centre", "1,6", "mon-fri 6:30-21:00; weekends 8-18",  # pool hours
         "",  # done adding places
@@ -160,11 +164,15 @@ def test_ac_060_init_wizard_builds_a_valid_config_from_plain_answers(tmp_path):
     with pytest.raises(StopIteration):  # 'Sunday: 9-11' has two places: it asks again
         run_wizard(ask, said.append)
     assert any("say where" in s for s in said)
+    assert any("✗" in s for s in said)  # 'abc' isn't an FTP: asked again
 
-    ask = _answers("", "", "", "6", "", "3,5", "", "7-8", "", "7-8", "", "", "8-10", "")
+    skip_fitness = ("",) * 6  # 5k, CSS, 400m, FTP, threshold HR, max HR
+    ask = _answers("", "", "", "6", *skip_fitness, "", "3,5", "", "7-8", "", "7-8", "", "",
+                   "8-10", "")
     data = run_wizard(ask, said.append)
     cfg = parse_config(data)
-    assert cfg.race == "sprint" and cfg.weekly_hours == 6 and cfg.locations[0].name == "Home"
+    assert cfg.race == "sprint" and cfg.profile.current_hours == 6
+    assert cfg.locations[0].name == "Home" and cfg.profile.known == []
     assert [s.day for s in cfg.templates["normal"].slots] == ["mon", "wed", "sat"]
     path = tmp_path / "a.yaml"
     path.write_text(to_yaml(data))
@@ -218,13 +226,17 @@ def test_ac_062_log_command_records_sessions_interactively_or_in_one_line(tmp_pa
     out = tmp_path / "out"
     assert cli.main(["week", str(joe), "--week", "2026-11-09", "--out", str(out)]) == 0
     monkeypatch.setattr(cli, "_now", lambda _cfg: datetime(2026, 11, 10, 21, 0))
-    # Mon: done, 25 minutes, sore. Tue: skipped, pool closed.
-    monkeypatch.setattr("builtins.input", _answers("d", "25", "y", "s", "2"))
+    todo = [r.session_id for r in read_log(out / "log.csv") if r.on <= date(2026, 11, 10)]
+    assert len(todo) >= 2
+    # First session: done, 25 minutes, sore. Second: skipped, pool closed. Rest: later.
+    answers = iter(["d", "25", "y", "s", "2"])
+    monkeypatch.setattr("builtins.input", lambda _p: next(answers, ""))
     assert cli.main(["log", str(joe), "--out", str(out)]) == 0
-    rows = {r.on: r for r in read_log(out / "log.csv") if r.on <= date(2026, 11, 10)}
-    mon, tue = rows[date(2026, 11, 9)], rows[date(2026, 11, 10)]
-    assert (mon.status, mon.actual_min, mon.pain) == ("done", 25, True)
-    assert (tue.status, tue.reason) == ("skipped", "facility_closed")
+    rows = {r.session_id: r for r in read_log(out / "log.csv")}
+    first, second = rows[todo[0]], rows[todo[1]]
+    assert (first.status, first.actual_min, first.pain) == ("done", 25, True)
+    assert (second.status, second.reason) == ("skipped", "facility_closed")
+    assert all(not rows[sid].logged for sid in todo[2:])  # Enter = later
     sid = next(r.session_id for r in read_log(out / "log.csv") if r.on == date(2026, 11, 14))
     assert cli.main(["log", str(joe), "--out", str(out), "--session", sid, "--status", "done"]) == 0
     sat = next(r for r in read_log(out / "log.csv") if r.session_id == sid)
@@ -272,7 +284,12 @@ def test_ac_064_today_shows_sessions_with_instructions_and_phase_from_race_date(
     capsys.readouterr()
     assert cli.main(["today", str(joe), "--out", str(out), "--date", "2026-11-14"]) == 0
     text = capsys.readouterr().out
-    assert "Saturday 14 November" in text and "Bike long" in text and "easy, steady" in text
+    plan = cli.Workspace(joe, out).plan(date(2026, 11, 9))
+    assert plan is not None
+    sat = [p for p in plan.placements if p.slot.on == date(2026, 11, 14)]
+    assert sat and "Saturday 14 November" in text
+    assert all(p.session.title in text for p in sat)
+    assert "steady" in text.lower()  # the why, not just the name
     assert cli.main(["today", str(joe), "--out", str(out), "--date", "2026-11-20"]) == 2
     assert cli.main(["week", str(tmp_path / "missing.yaml")]) == 1  # friendly config error
     assert "tri-plan init" in capsys.readouterr().err

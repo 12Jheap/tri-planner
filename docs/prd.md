@@ -102,7 +102,7 @@ Two stages:
 **Description:** As an athlete who isn't a programmer, I want to set up, plan, log and re-plan in plain English, and get a training load a coach would sign off, so I keep using it.
 **Agent:** Advocate
 **Acceptance Criteria:**
-- [ ] Weekly volume comes from the athlete's target hours; free time is only a ceiling (build +10%, taper −40%)
+- [ ] Weekly volume starts from what the athlete trains now and ramps from what they actually did; free time is only a ceiling (build +10%, taper −40%) — amended 1 Nov 2026: no target-hours input
 - [ ] No session exceeds the race-appropriate cap for its kind (e.g. sprint long run ≤ 60')
 - [ ] A Key session too long for every slot is shortened to the longest slot that can host it, with a note, instead of failing the week
 - [ ] After a plan or re-plan the log matches it: unlogged rows follow moves, dropped sessions are removed, logged rows never change
@@ -123,6 +123,17 @@ Two stages:
 - [ ] From Today or Week: Done (minutes, something hurt, another time), Skipped with one reason tap, and Undo
 - [ ] "Something's changed" re-plans from ticked slots, a new or cleared injury and flagged sessions, and shows a receipt for every move
 - [ ] Every form needs the page's secret token, so another website open in your browser can't change your plan or log
+
+### US-016: Personalised sessions planned into your availability
+**Description:** As an athlete, I want to say when I'm free and how fit I am now, and get real sessions (tempo, threshold, CSS, bricks) with my own paces, watts and heart rates, fitted into those slots, so the plan feels like it was written for me.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] A 5k time, swim CSS (or 400m + 200m time trials), FTP and threshold or max HR give personal run pace, swim pace, bike power and HR zones that don't overlap; missing numbers fall back to effort; impossible numbers are rejected
+- [ ] Base has tempo, sweet-spot and CSS work; build adds threshold Key sessions plus VO2 and a brick; taper keeps short race-pace openers; every 4th week before the race is a lighter recovery week with no hard sessions
+- [ ] Every session is a structured workout (warm-up, main set, cool-down) that adds up to its planned length, with targets from your zones, and the same steps and targets go into the calendar event and the .FIT file
+- [ ] Sessions are fitted into your free slots and aerobic sessions grow into spare slot time up to the week's budget, never past a session's maximum, the next session, or a facility's opening hours; volume grows from what you train now and what you actually did
+- [ ] Across a real season: no hard session on the same day as a long one, long ride and long run on different days, nothing on race day, and a packed exam week keeps its most valuable sessions instead of failing
+- [ ] The profile page asks for current fitness and shows your zones; each session page shows why, a zone timeline and every step with your targets; the interface uses no emoji
 
 ### v1 — MVP web app (only if gates pass)
 
