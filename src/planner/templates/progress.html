@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Progress · tri-planner{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+<div class="head"><div><div class="eyebrow">Completed ÷ planned</div><h1>Progress</h1></div></div>
+
+{% if not weeks %}
+  <div class="empty"><h3>Nothing to show yet</h3><p class="muted">Plan a week and log a few sessions.</p></div>
+{% else %}
+  {% set latest = weeks[0] %}
+  <div class="stats">
+    <div class="stat"><div class="v tnum">{{ (latest.ratio * 100)|round|int }}%</div><div class="k">week of {{ latest.week.strftime('%d %b') }}</div></div>
+    <div class="stat"><div class="v tnum">{{ weeks|selectattr('ratio', 'ge', 0.5)|list|length }}/{{ weeks|length }}</div><div class="k">weeks at 50% or more</div></div>
+  </div>
+
+  <h2>By week</h2>
+  <div class="bars">
+  {% for s in weeks %}
+    <div class="b">
+      <span class="muted">{{ s.week.strftime('%d %b') }}</span>
+      <div class="track"><i class="{{ 'weak' if s.low_response }}" style="width: {{ [s.ratio * 100, 100]|min }}%"></i></div>
+      <span style="text-align:right">{{ (s.ratio * 100)|round|int }}%</span>
+    </div>
+    <div class="small muted" style="margin:-6px 0 4px 82px">{{ fmt_min(s.completed_min) }} of {{ fmt_min(s.planned_min) }} · {{ s.logged }}/{{ s.sessions }} logged{% if s.low_response %} · under 70% logged, so read with caution{% endif %}</div>
+  {% endfor %}
+  </div>
+  <p class="small muted">Target: 50% or more for 6 weeks in a row.</p>
+
+  <h2>By sport</h2>
+  <div class="bars">
+  {% for sport, r in by_sport.items()|sort %}
+    <div class="b">
+      <span class="sport s-{{ sport }}" style="font-size:12px">{{ sport }}</span>
+      <div class="track"><i style="width: {{ [r * 100, 100]|min }}%"></i></div>
+      <span style="text-align:right">{{ (r * 100)|round|int }}%</span>
+    </div>
+  {% endfor %}
+  </div>
+
+  {% if slots %}
+  <h2>Which slots work</h2>
+  <p class="small muted" style="max-width:60ch">Chance you train when a session's in that slot, learned from your log. Key sessions drift towards the top of this list.</p>
+  <table class="data">
+    <tr><th>Slot</th><th style="text-align:right">Chance</th><th style="text-align:right">Logged</th></tr>
+    {% for s in slots %}
+      <tr><td>{{ label(s.key) }}</td><td class="num" style="text-align:right">{{ (s.p * 100)|round|int }}%</td><td class="num" style="text-align:right">{{ s.n }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if by_type|length > 1 %}
+  <h2>The experiment</h2>
+  {% set diff = (by_type.get('facility_aware', 0) - by_type.get('time_only', 0)) * 100 %}
+  <p>Facility-aware weeks <b class="tnum">{{ (by_type.get('facility_aware', 0) * 100)|round|int }}%</b> · time-only weeks <b class="tnum">{{ (by_type.get('time_only', 0) * 100)|round|int }}%</b></p>
+  <p class="muted">{{ 'Facility-awareness is helping.' if diff >= 10 else 'No clear uplift yet (target: 10 points or more).' }}</p>
+  {% endif %}
+{% endif %}
+{% endblock %}

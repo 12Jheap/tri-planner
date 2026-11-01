@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% from "_session.html" import full, log_controls with context %}
+{% block title %}Today · tri-planner{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{{ day.strftime('%A %d %B') }}</div>
+    <h1>{% if not plan %}Today{% elif cards %}{{ cards|length }} session{{ 's' if cards|length > 1 }} · {{ fmt_min(cards|sum(attribute='s.duration_min')) }}{% else %}Rest day{% endif %}</h1>
+  </div>
+  <div class="nav">
+    <a class="iconbtn" href="{{ url_for('today', d=prev) }}" aria-label="Previous day"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></a>
+    {% if not is_today %}<a class="btn" href="{{ url_for('today') }}">Today</a>{% endif %}
+    <a class="iconbtn" href="{{ url_for('today', d=next) }}" aria-label="Next day"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></a>
+  </div>
+</div>
+
+{% for b in banners %}<div class="msg">{{ b }}</div>{% endfor %}
+
+{% if plan %}
+<div class="toolbar">
+  {% if garmin_ready %}
+  <form method="post" action="{{ url_for('sync') }}">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="next" value="{{ url_for('today', d=day) }}">
+    <button class="primary">Sync from Garmin</button>
+  </form>
+  {% endif %}
+  <form method="post" action="{{ url_for('import_files') }}" enctype="multipart/form-data" id="upload">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="next" value="{{ url_for('today', d=day) }}">
+    <label class="btn filepick">Add activity files
+      <input type="file" name="files" accept=".fit,.zip" multiple onchange="this.form.submit()">
+    </label>
+  </form>
+  {% if not garmin_ready %}<a class="small muted" href="{{ url_for('setup') }}#garmin">Connect Garmin</a>
+  {% elif sync %}<span class="small muted">{% if sync.error %}Last sync failed: {{ sync.error }}{% else %}Synced {{ sync.at.strftime('%H:%M') }}{% endif %}</span>{% endif %}
+</div>
+{% endif %}
+
+{% if ready and ready.level != 'unknown' %}
+<section class="ready ready-{{ ready.level }}" aria-label="Recovery check">
+  <div class="row" style="justify-content:space-between">
+    <b>{{ ready.headline }}</b>
+    <span class="small muted">From Garmin this morning · your signals, not a diagnosis</span>
+  </div>
+  <ul>
+    {% for f in ready.flags %}<li class="flag">{{ f }}</li>{% endfor %}
+    {% for f in ready.fine %}<li>{{ f }}</li>{% endfor %}
+  </ul>
+  {% if ready.level == 'low' and can_ease %}
+    <p class="small" style="margin:8px 0">On a day like this, an easy session usually does more good than a hard one done badly. Your call.</p>
+    <div class="row">
+    {% for c in can_ease %}
+      <form method="post" action="{{ url_for('ease') }}">
+        <input type="hidden" name="token" value="{{ token }}">
+        <input type="hidden" name="week" value="{{ c.week }}">
+        <input type="hidden" name="session" value="{{ c.s.id }}">
+        <input type="hidden" name="next" value="{{ url_for('today') }}">
+        <button>Make {{ c.s.title|lower }} easy</button>
+      </form>
+    {% endfor %}
+    </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if summary %}
+  <div class="small muted tnum">This week: {{ fmt_min(summary.completed_min) }} of {{ fmt_min(summary.planned_min) }} done · {{ summary.logged }} of {{ summary.sessions }} logged</div>
+  <div class="meter"><i style="width: {{ [summary.ratio * 100, 100]|min }}%"></i></div>
+{% endif %}
+
+{% if not plan %}
+  <div class="empty" style="margin-top:20px">
+    <h3>This week isn't planned yet</h3>
+    <p class="muted">No plan for this week yet. It fits sessions into your free slots and the kit that's there.</p>
+    <form method="post" action="{{ url_for('plan_week') }}" style="margin-top:14px">
+      <input type="hidden" name="token" value="{{ token }}">
+      <input type="hidden" name="week" value="{{ week }}">
+      <button class="primary">Plan this week</button>
+    </form>
+  </div>
+{% else %}
+  <div style="margin-top:20px">
+  {% for c in cards %}
+    {{ full(c, url_for('today', d=day)) }}
+  {% else %}
+    <p class="muted">Nothing planned. Recovery is where the training turns into fitness.</p>
+  {% endfor %}
+  </div>
+
+  {% if catch_up %}
+    <h2>Not logged yet</h2>
+    <div class="list">
+    {% for c in catch_up %}
+      <div class="li" id="s-{{ c.s.id }}" style="grid-template-columns: 92px 1fr; align-items: start">
+        <span class="when">{{ c.p.slot.on.strftime('%a') }} {{ c.p.start.strftime('%H:%M') }}</span>
+        <div>
+          <span class="sport s-{{ c.s.discipline }}">{{ c.s.discipline }}</span>
+          <div><a class="t" href="{{ url_for('session_detail', week=c.week, sid=c.s.id) }}" style="text-decoration:none">{{ c.s.title }}</a> <span class="muted">· {{ fmt_min(c.s.duration_min) }}</span></div>
+          {{ log_controls(c, url_for('today', d=day)) }}
+        </div>
+      </div>
+    {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if upcoming %}
+    <h2>Coming up</h2>
+    <div class="list">
+    {% for p in upcoming %}
+      <a class="li" href="{{ url_for('session_detail', week=week, sid=p.session.id) }}">
+        <span class="when">{{ p.slot.on.strftime('%a') }} {{ p.start.strftime('%H:%M') }}</span>
+        <span><span class="t">{{ p.session.title }}</span> <span class="muted">· {{ p.slot.location }}</span></span>
+        <span class="muted tnum">{{ fmt_min(p.session.duration_min) }}</span>
+      </a>
+    {% endfor %}
+    </div>
+    <p class="small"><a href="{{ url_for('week_view', w=week) }}">Whole week</a></p>
+  {% endif %}
+{% endif %}
+{% endblock %}

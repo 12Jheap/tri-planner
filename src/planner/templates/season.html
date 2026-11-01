@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Season · tri-planner{% endblock %}
+{% block body %}
+{% set this = weeks|selectattr('when', 'equalto', 'now')|first %}
+<div class="head">
+  <div>
+    <div class="eyebrow">{% if race %}Race {{ race.strftime('%d %B %Y') }}{% else %}Next 12 weeks{% endif %}</div>
+    <h1>Season</h1>
+  </div>
+</div>
+
+<div class="stats">
+  {% if race %}<div class="stat"><div class="v tnum">{{ ((race - this.week).days // 7) if this else '' }}</div><div class="k">weeks to race</div></div>{% endif %}
+  {% if this %}<div class="stat"><div class="v">{{ 'Recovery' if this.recovery else this.phase|capitalize }}</div><div class="k">this week</div></div>{% endif %}
+  {% set done = weeks|selectattr('done_min')|list %}
+  {% if done %}<div class="stat"><div class="v tnum">{{ fmt_min(done|sum(attribute='done_min')) }}</div><div class="k">trained so far</div></div>{% endif %}
+</div>
+
+<div class="legend" style="margin-top:6px">
+  <span><i class="season-key projected"></i>Heading for</span>
+  <span><i class="season-key planned"></i>Planned</span>
+  <span><i class="season-key done"></i>Done</span>
+  <span><i class="season-key free"></i>Free time</span>
+</div>
+
+<div class="season" role="table" aria-label="Weeks to race">
+  {% for w in weeks %}
+    {% set has_plan = w.planned_min is not none %}
+    <a class="sw {{ w.when }}{{ ' recovery' if w.recovery }}{{ ' race' if w.race }} ph-{{ w.phase }}" href="{{ url_for('week_view', w=w.week) }}" role="row">
+      <span class="sw-date tnum" role="cell">{{ w.week.strftime('%d %b') }}</span>
+      <span class="sw-phase" role="cell">
+        {%- if w.race %}Race week{% elif w.recovery %}Recovery{% else %}{{ w.phase|capitalize }}{% endif -%}
+        {%- if experiment and w.week >= experiment %}<span class="muted"> · {{ 'test' if w.week_type == 'time_only' else 'aware' }}</span>{% endif -%}
+      </span>
+      <span class="sw-bars" role="cell">
+        <span class="bar free" style="width: {{ [100 * w.available_min / top, 100]|min }}%"></span>
+        <span class="bar projected" style="width: {{ 100 * w.projected_min / top }}%"></span>
+        {% if has_plan %}<span class="bar planned" style="width: {{ 100 * w.planned_min / top }}%"></span>{% endif %}
+        {% if w.done_min %}<span class="bar done" style="width: {{ 100 * w.done_min / top }}%"></span>{% endif %}
+      </span>
+      <span class="sw-num tnum" role="cell">
+        {%- if w.done_min is not none and w.when == 'past' %}{{ fmt_min(w.done_min) }}<span class="muted"> / {{ fmt_min(w.planned_min) }}</span>
+        {%- elif has_plan %}{{ fmt_min(w.planned_min) }}
+        {%- else %}<span class="muted">~{{ fmt_min(w.projected_min) }}</span>{% endif -%}
+      </span>
+      <span class="sw-note" role="cell">{{ w.labels|join(', ') }}{% if w.when == 'now' %}{{ ' · ' if w.labels }}this week{% endif %}</span>
+    </a>
+  {% endfor %}
+</div>
+
+<p class="small muted" style="max-width:68ch;margin-top:16px">
+  "Heading for" is what the planner will aim for if you complete each week: it starts from what you train now, grows about 10% a week up to a {{ ceiling|int }}h ceiling for your distance, eases off every 4th week, and is never more than your free time allows. Holidays and exams come from your Profile. Weeks you've actually trained replace the projection.
+</p>
+{% endblock %}

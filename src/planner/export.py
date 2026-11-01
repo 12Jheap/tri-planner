@@ -13,26 +13,33 @@ from zoneinfo import ZoneInfo
 
 from icalendar import Calendar, Event
 
+from planner.profile import Profile
+from planner.sessions import how_to
 from planner.solver import Placement, Plan
+from planner.workouts import Step, workout_for
 
 FIT_SPORTS = {"swim", "bike", "run"}
 
 
-def _describe(p: Placement) -> str:
+def _describe(p: Placement, profile: Profile | None = None) -> str:
     s = p.session
-    lines = [
-        f"{s.kind.replace('_', ' ').title()} — {s.duration_min} min, intensity {s.intensity}/5",
-        "KEY session (protected)" if s.key else "Flex session (moves first if life happens)",
-        f"Needs: {', '.join('/'.join(f.value for f in g) for g in s.requires) or 'nothing'}",
-    ]
+    w = workout_for(s, profile)
+    lines = [f"{s.title} · {s.duration_min} min · intensity {s.intensity}/5", how_to(s), ""]
+    for b in w.blocks:
+        lines.append(f"• {b.summary()}")
+        notes = {st.note for st in b.steps if st.note}
+        lines += [f"   {n}" for n in notes]
+    lines += ["", "Key session: protected when the week changes" if s.key
+              else "Flex session: moves first if life happens"]
     if p.reason:
-        lines.append(f"Moved: {p.reason}")
+        lines.append(f"Moved: {p.reason.replace('_', ' ')}")
     if not p.facility_ok:
         lines.append("WARNING: facility not available here (time-only experiment week)")
     return "\n".join(lines)
 
 
-def to_ics(plan: Plan, path: str | Path, tz: str = "Europe/London") -> Path:
+def to_ics(plan: Plan, path: str | Path, tz: str = "Europe/London",
+           profile: Profile | None = None) -> Path:
     zone = ZoneInfo(tz)
     cal = Calendar()
     cal.add("prodid", "-//tri-planner//v0//EN")
@@ -45,7 +52,7 @@ def to_ics(plan: Plan, path: str | Path, tz: str = "Europe/London") -> Path:
         ev.add("dtstart", p.starts_at.replace(tzinfo=zone))
         ev.add("duration", dt.timedelta(minutes=p.session.duration_min))
         ev.add("location", p.slot.location)
-        ev.add("description", _describe(p))
+        ev.add("description", _describe(p, profile))
         ev.add("dtstamp", dt.datetime.now(tz=zone))
         cal.add_component(ev)
     out = Path(path)
@@ -53,52 +60,68 @@ def to_ics(plan: Plan, path: str | Path, tz: str = "Europe/London") -> Path:
     return out
 
 
-def _steps(p: Placement) -> list[tuple[str, str, int, int]]:
-    """(name, intensity, seconds, hr_zone) steps for a session."""
-    s = p.session
-    total = s.duration_min * 60
-    wu = 600 if s.duration_min >= 40 else 300
-    cd = 300
-    main = total - wu - cd
-    zone = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5}[s.intensity]
-    steps: list[tuple[str, str, int, int]] = [("Warm up", "warmup", wu, 1)]
-    if s.kind == "threshold" and main >= 900:
-        reps = max(2, min(5, main // 720))
-        work = (main - (reps - 1) * 180) // reps
-        for i in range(reps):
-            steps.append((f"Rep {i + 1}/{reps} threshold", "active", work, zone))
-            if i < reps - 1:
-                steps.append(("Recover easy", "recovery", 180, 1))
+HR_ZONE = {"recovery": 1, "easy": 2, "steady": 2, "race": 3, "tempo": 3, "threshold": 4, "vo2": 5,
+           "sprint": 5}
+STEP_KIND = {"Warm-up": "warmup", "Cool-down": "cooldown"}
+MAX_STEPS = 60
+
+
+def _fit_step(step: Step, discipline: str, profile: Profile) -> object:
+    """One FIT workout step with the most useful target this athlete has numbers for."""
+    from fit_tool.profile.messages.workout_step_message import WorkoutStepMessage
+    from fit_tool.profile.profile_type import Intensity, WorkoutStepDuration, WorkoutStepTarget
+
+    st = WorkoutStepMessage()
+    st.workout_step_name = step.label[:30]
+    kind = STEP_KIND.get(step.label, "recovery" if step.zone == "recovery" else "active")
+    st.intensity = {"warmup": Intensity.WARMUP, "cooldown": Intensity.COOLDOWN,
+                    "recovery": Intensity.RECOVERY, "active": Intensity.ACTIVE}[kind]
+    if step.metres:
+        st.duration_type = WorkoutStepDuration.DISTANCE
+        st.duration_distance = float(step.metres)
     else:
-        steps.append((s.kind.replace("_", " ").title(), "active", main, zone))
-    steps.append(("Cool down", "cooldown", cd, 1))
-    return steps
+        st.duration_type = WorkoutStepDuration.TIME
+        st.duration_time = float(step.seconds)
+    notes = " · ".join(x for x in (step.target, step.note) if x)
+    if notes:
+        st.notes = notes[:100]
+    pace = profile.run_pace(step.zone) if discipline == "run" else None
+    watts = profile.bike_power(step.zone) if discipline == "bike" else None
+    hr = profile.hr(step.zone) if discipline in ("run", "bike") else None
+    if pace:  # FIT wants speed in m/s: faster pace = higher speed
+        st.target_type = WorkoutStepTarget.SPEED
+        st.target_value = 0
+        st.custom_target_speed_low = round(1000 / pace[1], 3)
+        st.custom_target_speed_high = round(1000 / pace[0], 3)
+    elif watts:  # FIT: values above 1000 are watts + 1000
+        st.target_type = WorkoutStepTarget.POWER
+        st.target_value = 0
+        st.custom_target_power_low = watts[0] + 1000
+        st.custom_target_power_high = watts[1] + 1000
+    elif hr:  # FIT: values above 100 are bpm + 100
+        st.target_type = WorkoutStepTarget.HEART_RATE
+        st.target_value = 0
+        st.custom_target_heart_rate_low = hr[0] + 100
+        st.custom_target_heart_rate_high = hr[1] + 100
+    elif discipline in ("run", "bike"):
+        st.target_type = WorkoutStepTarget.HEART_RATE
+        st.target_hr_zone = HR_ZONE[step.zone]
+    else:
+        st.target_type = WorkoutStepTarget.OPEN
+    return st
 
 
-def to_fit(p: Placement, path: str | Path) -> Path | None:
+def to_fit(p: Placement, path: str | Path, profile: Profile | None = None) -> Path | None:
     """Write a structured workout .FIT file. Returns None for unsupported sessions."""
     if p.session.discipline not in FIT_SPORTS:
         return None
     from fit_tool.fit_file_builder import FitFileBuilder
     from fit_tool.profile.messages.file_id_message import FileIdMessage
     from fit_tool.profile.messages.workout_message import WorkoutMessage
-    from fit_tool.profile.messages.workout_step_message import WorkoutStepMessage
-    from fit_tool.profile.profile_type import (
-        FileType,
-        Intensity,
-        Manufacturer,
-        Sport,
-        WorkoutStepDuration,
-        WorkoutStepTarget,
-    )
+    from fit_tool.profile.profile_type import FileType, Manufacturer, Sport
 
+    profile = profile or Profile()
     sport = {"swim": Sport.SWIMMING, "bike": Sport.CYCLING, "run": Sport.RUNNING}
-    intensity = {
-        "warmup": Intensity.WARMUP,
-        "active": Intensity.ACTIVE,
-        "recovery": Intensity.RECOVERY,
-        "cooldown": Intensity.COOLDOWN,
-    }
     fid = FileIdMessage()
     fid.type = FileType.WORKOUT
     fid.manufacturer = Manufacturer.DEVELOPMENT.value
@@ -106,20 +129,18 @@ def to_fit(p: Placement, path: str | Path) -> Path | None:
     fid.time_created = round(dt.datetime.now(tz=dt.UTC).timestamp() * 1000)
     fid.serial_number = 0x7A1C0001
 
+    workout = workout_for(p.session, profile)
+    flat = workout.flat()[:MAX_STEPS]
+    discipline = p.session.discipline
     steps = []
-    for name, kind, seconds, hr_zone in _steps(p):
-        st = WorkoutStepMessage()
-        st.workout_step_name = name[:30]
-        st.intensity = intensity[kind]
-        st.duration_type = WorkoutStepDuration.TIME
-        st.duration_time = float(seconds)
-        st.target_type = WorkoutStepTarget.HEART_RATE
-        st.target_hr_zone = hr_zone
-        steps.append(st)
+    for st in flat:
+        # A brick's run-off-the-bike step targets run pace / HR even inside a ride.
+        d = "run" if p.session.kind == "brick" and st.label.startswith("Run") else discipline
+        steps.append(_fit_step(st, d, profile))
 
     wk = WorkoutMessage()
-    wk.workout_name = p.session.label[:40]
-    wk.sport = sport[p.session.discipline]
+    wk.workout_name = f"{p.session.title} {p.session.duration_min}'"[:40]
+    wk.sport = sport[discipline]
     wk.num_valid_steps = len(steps)
 
     builder = FitFileBuilder(auto_define=True, min_string_size=50)
@@ -131,14 +152,17 @@ def to_fit(p: Placement, path: str | Path) -> Path | None:
     return out
 
 
-def export_week(plan: Plan, out_dir: str | Path, tz: str = "Europe/London") -> dict[str, list[Path]]:
+def export_week(plan: Plan, out_dir: str | Path, tz: str = "Europe/London",
+                profile: Profile | None = None) -> dict[str, list[Path]]:
     """Write plan.ics plus one .FIT per supported session into `out_dir`."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    ics = to_ics(plan, out / "plan.ics", tz)
+    for old in out.glob("*.fit"):  # a re-plan must not leave workouts for moved sessions
+        old.unlink()
+    ics = to_ics(plan, out / "plan.ics", tz, profile)
     fits = []
     for p in plan.placements:
-        f = to_fit(p, out / f"{p.slot.on}_{p.session.id}.fit")
+        f = to_fit(p, out / f"{p.slot.on}_{p.session.id}.fit", profile)
         if f is not None:
             fits.append(f)
     return {"ics": [ics], "fit": fits}

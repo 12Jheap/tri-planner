@@ -415,6 +415,309 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 - **Evidence:** —
 - **Verified-by:** —
 
+### US-014: Everyday usability and sane training load (v0)
+
+#### AC-055: Weekly volume starts from what the athlete trains now and ramps from what they actually did; free time is only a ceiling (build +10%, taper −40%) — amended 1 Nov 2026: no target-hours input
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_055_weekly_volume_comes_from_target_hours_not_free_time
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_055_weekly_volume_comes_from_target_hours_not_free_time` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-056: No session exceeds the race-appropriate cap for its kind (e.g. sprint long run ≤ 60')
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_056_no_session_is_longer_than_its_race_appropriate_cap
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_056_no_session_is_longer_than_its_race_appropriate_cap` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-057: A Key session too long for every slot is shortened to the longest slot that can host it, with a note, instead of failing the week
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_057_key_session_too_long_for_every_slot_is_shortened_not_infeasible
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_057_key_session_too_long_for_every_slot_is_shortened_not_infeasible` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-058: After a plan or re-plan the log matches it: unlogged rows follow moves, dropped sessions are removed, logged rows never change
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_058_log_follows_the_plan_without_touching_logged_rows
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_058_log_follows_the_plan_without_touching_logged_rows` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-059: A re-plan keeps earlier sessions in the stored week and only reschedules Key sessions logged as skipped, as Flex catch-ups
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_059_replan_keeps_history_and_only_redoes_skipped_key_sessions
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_059_replan_keeps_history_and_only_redoes_skipped_key_sessions` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-060: `init` builds a valid config from plain answers (no YAML knowledge), and unquoted YAML times like 6:30 load as 06:30
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_060_init_wizard_builds_a_valid_config_from_plain_answers
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_060_init_wizard_builds_a_valid_config_from_plain_answers` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-061: Plain-English inputs: --week this/next, --injury run[:days|:date], --unavailable thu / thu-pm / "thu 16:30" / a date
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_061_plain_english_week_injury_and_slot_inputs
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_061_plain_english_week_injury_and_slot_inputs` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-062: `log` records done/skipped/moved with minutes, reason and pain, by asking one session at a time or in one line
+- **Method:** e2e-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_062_log_command_records_sessions_interactively_or_in_one_line
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_062_log_command_records_sessions_interactively_or_in_one_line` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-063: Declared injuries persist across commands, apply when planning a new week, and can be cleared (which also lifts a pain freeze)
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_063_declared_injuries_persist_apply_to_week_and_can_be_cleared
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_063_declared_injuries_persist_apply_to_week_and_can_be_cleared` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-064: `today` shows today's sessions with plain-English instructions, and the phase is picked from the race date
+- **Method:** e2e-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_064_today_shows_sessions_with_instructions_and_phase_from_race_date
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_064_today_shows_sessions_with_instructions_and_phase_from_race_date` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+### US-015: Local web app (v0)
+
+#### AC-065: `tri-plan web` serves Today, Week, Changed, Progress and Setup; with no config the first page is Setup
+- **Method:** e2e-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_065_serves_every_page_and_sends_first_run_to_setup
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_065_serves_every_page_and_sends_first_run_to_setup` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-066: The setup form creates and edits the config without YAML; bad input is rejected with a reason and the file is left alone; an existing config round-trips unchanged
+- **Method:** e2e-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_066_setup_form_writes_a_valid_config_and_rejects_bad_input
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_066_setup_form_writes_a_valid_config_and_rejects_bad_input` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-067: Planning a week from the website writes the same plan, .ics, .FIT and log as the CLI, and offers the .ics and a .zip of workouts to download
+- **Method:** e2e-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_067_planning_from_the_website_writes_the_same_files_and_offers_downloads
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_067_planning_from_the_website_writes_the_same_files_and_offers_downloads` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-068: From Today or Week: Done (minutes, something hurt, another time), Skipped with one reason tap, and Undo
+- **Method:** e2e-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_068_log_done_skipped_and_undo_from_the_website
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_068_log_done_skipped_and_undo_from_the_website` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-069: "Something's changed" re-plans from ticked slots, a new or cleared injury and flagged sessions, and shows a receipt for every move
+- **Method:** e2e-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_069_something_changed_replans_and_shows_a_receipt_per_move
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_069_something_changed_replans_and_shows_a_receipt_per_move` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-070: Every form needs the page's secret token, so another website open in your browser can't change your plan or log
+- **Method:** unit-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_070_forms_only_accept_posts_from_the_app_itself
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_070_forms_only_accept_posts_from_the_app_itself` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+### US-016: Personalised sessions planned into your availability (v0)
+
+#### AC-071: A 5k time, swim CSS (or 400m + 200m time trials), FTP and threshold or max HR give personal run pace, swim pace, bike power and HR zones that don't overlap; missing numbers fall back to effort; impossible numbers are rejected
+- **Method:** unit-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_071_fitness_numbers_give_personal_non_overlapping_zones
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_071_fitness_numbers_give_personal_non_overlapping_zones` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-072: Base has tempo, sweet-spot and CSS work; build adds threshold Key sessions plus VO2 and a brick; taper keeps short race-pace openers; every 4th week before the race is a lighter recovery week with no hard sessions
+- **Method:** unit-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_072_every_phase_has_the_right_quality_work_and_recovery_weeks
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_072_every_phase_has_the_right_quality_work_and_recovery_weeks` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-073: Every session is a structured workout (warm-up, main set, cool-down) that adds up to its planned length, with targets from your zones, and the same steps and targets go into the calendar event and the .FIT file
+- **Method:** integration-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_073_structured_workouts_with_targets_on_screen_calendar_and_watch
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_073_structured_workouts_with_targets_on_screen_calendar_and_watch` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-074: Sessions are fitted into your free slots and aerobic sessions grow into spare slot time up to the week's budget, never past a session's maximum, the next session, or a facility's opening hours; volume grows from what you train now and what you actually did
+- **Method:** unit-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_074_availability_drives_the_plan_and_spare_slot_time_is_used
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_074_availability_drives_the_plan_and_spare_slot_time_is_used` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-075: Across a real season: no hard session on the same day as a long one, long ride and long run on different days, nothing on race day, and a packed exam week keeps its most valuable sessions instead of failing
+- **Method:** e2e-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_075_coaching_rules_hold_across_a_real_season
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_075_coaching_rules_hold_across_a_real_season` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-076: The profile page asks for current fitness and shows your zones; each session page shows why, a zone timeline and every step with your targets; the interface uses no emoji
+- **Method:** e2e-test
+- **Test:** `tests/test_us_016_personalised_training.py` > test_ac_076_profile_and_session_pages_show_personal_targets_without_emoji
+- **Status:** verified
+- **Evidence:** `tests/test_us_016_personalised_training.py::test_ac_076_profile_and_session_pages_show_personal_targets_without_emoji` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+### US-017: Less logging, season view, moving sessions, the experiment (v0)
+
+#### AC-077: The experiment is switched on from the Profile page: weeks then alternate facility-aware / time-only, test weeks are labelled, and the season shows which is which
+- **Method:** e2e-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_077_experiment_is_switched_on_from_the_website
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_077_experiment_is_switched_on_from_the_website` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-078: The season view lists every week to race day with its phase, recovery weeks, holidays and exams, what was planned and done, and the volume the planner is heading for (≤10%/week growth, a ceiling for the distance, never more than free time)
+- **Method:** e2e-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_078_season_view_shows_the_road_to_race_day
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_078_season_view_shows_the_road_to_race_day` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-079: You can move a session to any later slot where its kit is open and there's room; the plan, log and files follow, a logged session can't be moved, and breaking a coaching rule is allowed but flagged
+- **Method:** e2e-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_079_move_a_session_yourself_within_the_rules
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_079_move_a_session_yourself_within_the_rules` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-080: Activity files (.fit, a .zip export, or a folder) tick off the matching planned session: same sport and week, same day = done, other day = moved; a brick's run leg is merged; extras are reported, not forced in; nothing is imported twice and sessions you logged yourself are left alone
+- **Method:** integration-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_080_watch_files_tick_off_the_right_sessions_once
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_080_watch_files_tick_off_the_right_sessions_once` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-081: "Sync from Garmin" uses Garmin's Personal API client with your key from ~/.config/garmin or GARMIN_PERSONAL_API_KEY, downloads recent activities' original files and ticks off sessions; no key or a refused key gives a plain message; the key is stored readable only by you and never in the project
+- **Method:** integration-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_081_garmin_personal_api_sync
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_081_garmin_personal_api_sync` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-082: On Today you can sync from Garmin or add activity files; imported sessions show time, distance and heart rate, and you can still say something hurt
+- **Method:** e2e-test
+- **Test:** `tests/test_us_017_less_logging_season_and_control.py` > test_ac_082_import_from_the_website_and_still_report_pain
+- **Status:** verified
+- **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_082_import_from_the_website_and_still_report_pain` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+### US-018: Strength opt-out, auto-sync, recovery check, Garmin heart rates, effort check (v0)
+
+#### AC-083: Profile lets you opt out of strength sessions; none are planned and their time goes to swim, bike and run, so the week isn't shorter
+- **Method:** e2e-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_083_you_can_opt_out_of_strength_sessions
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_083_you_can_opt_out_of_strength_sessions` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-084: Opening Today syncs with Garmin in the background at most every 30 minutes (activities and this morning's recovery data); the time of the last sync is shown, and a failed sync never breaks the page
+- **Method:** e2e-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_084_opening_the_app_syncs_with_garmin_at_most_every_30_minutes
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_084_opening_the_app_syncs_with_garmin_at_most_every_30_minutes` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-085: The recovery check reads last night's sleep, HRV and resting heart rate from Garmin and applies three plain rules (2+ flags = low, 1 = watch, 0 = good); missing data is "not available", never an alarm
+- **Method:** unit-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_085_recovery_check_reads_sleep_hrv_and_resting_hr
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_085_recovery_check_reads_sleep_hrv_and_resting_hr` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-086: On a low-recovery day with a quality session planned, Today offers to make it easy (same time, place and sport, easy effort); nothing changes unless you press it, and logged or already-easy sessions can't be eased
+- **Method:** e2e-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_086_on_a_low_day_it_offers_to_make_a_hard_session_easy
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_086_on_a_low_day_it_offers_to_make_a_hard_session_easy` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-087: Your threshold, max and resting heart rate can be read from Garmin; they are shown next to your current values and only saved when you tick and confirm, and your zones follow
+- **Method:** e2e-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_087_heart_rates_from_garmin_are_confirmed_before_use
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_087_heart_rates_from_garmin_are_confirmed_before_use` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-088: When your watch's average heart rate for an easy session was above your easy zone, the session says so; hard sessions and sessions without heart rate aren't flagged
+- **Method:** e2e-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_088_effort_check_flags_easy_sessions_done_too_hard
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_088_effort_check_flags_easy_sessions_done_too_hard` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+### US-019: Half distance (v0)
+
+#### AC-089: Half distance is a race option (Profile and init) with bike-heavy splits, more volume (10h default, ramping to a 16h ceiling), a 12-week build, and a clear note that half-iron races need you to be 18
+- **Method:** e2e-test
+- **Test:** `tests/test_us_019_half_distance.py` > test_ac_089_half_distance_is_a_race_option_with_bigger_training
+- **Status:** verified
+- **Evidence:** `tests/test_us_019_half_distance.py::test_ac_089_half_distance_is_a_race_option_with_bigger_training` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-090: Half sessions go long-course: long rides up to 4h, long runs up to 2h with fuelling notes, a long brick as a Key build session with a proper run off the bike, and race-pace (tempo) work rather than sprint-style VO2
+- **Method:** unit-test
+- **Test:** `tests/test_us_019_half_distance.py` > test_ac_090_half_sessions_are_long_course_sessions
+- **Status:** verified
+- **Evidence:** `tests/test_us_019_half_distance.py::test_ac_090_half_sessions_are_long_course_sessions` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-091: A half week on a school timetable uses double days when it needs to, never two sessions of the same sport in a day (a brick counts as a run), keeps the long ride and long run on different days and puts them at the weekend when the slots allow
+- **Method:** e2e-test
+- **Test:** `tests/test_us_019_half_distance.py` > test_ac_091_half_weeks_use_double_days_within_the_rules
+- **Status:** verified
+- **Evidence:** `tests/test_us_019_half_distance.py::test_ac_091_half_weeks_use_double_days_within_the_rules` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+### US-020: Season and plan agree; half workouts are race-specific (v0)
+
+#### AC-092: Planning any week targets the same volume the Season view shows for it (one shared rule); weeks planned far ahead say they assume you complete the weeks before, and a past week you didn't log holds volume flat instead of growing it
+- **Method:** e2e-test
+- **Test:** `tests/test_us_020_season_agrees_and_half_specific.py` > test_ac_092_planning_a_week_matches_what_season_shows
+- **Status:** verified
+- **Evidence:** `tests/test_us_020_season_agrees_and_half_specific.py::test_ac_092_planning_a_week_matches_what_season_shows` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-093: Half workouts differ from Olympic ones: race-effort blocks (76–83% FTP) in the long ride, a half-marathon-pace finish to the long run, longer CSS reps, long sweet-spot intervals and a brick that runs at half-marathon effort, with the same targets on the watch
+- **Method:** unit-test
+- **Test:** `tests/test_us_020_season_agrees_and_half_specific.py` > test_ac_093_half_workouts_are_built_for_the_half
+- **Status:** verified
+- **Evidence:** `tests/test_us_020_season_agrees_and_half_specific.py::test_ac_093_half_workouts_are_built_for_the_half` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+### US-021: Sessions fit short slots and the week spreads out (v0)
+
+#### AC-094: A session too long for a slot can run there shortened, down to its sensible minimum (a Key session that fits nowhere at all is rescued shorter with a note); full length is used whenever it fits, and the shortened workout still adds up
+- **Method:** unit-test
+- **Test:** `tests/test_us_021_spread_the_week.py` > test_ac_094_sessions_shrink_to_fit_a_short_slot_but_not_below_their_minimum
+- **Status:** verified
+- **Evidence:** `tests/test_us_021_spread_the_week.py::test_ac_094_sessions_shrink_to_fit_a_short_slot_but_not_below_their_minimum` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-095: On a timetable of short weekday slots and long weekends, weekday slots are used, quality sessions go midweek, the long ride and long run take different weekend days, and no weekend day carries two long sessions or more than its fair share plus the long session
+- **Method:** e2e-test
+- **Test:** `tests/test_us_021_spread_the_week.py` > test_ac_095_a_school_week_spreads_out_instead_of_piling_onto_the_weekend
+- **Status:** verified
+- **Evidence:** `tests/test_us_021_spread_the_week.py::test_ac_095_a_school_week_spreads_out_instead_of_piling_onto_the_weekend` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
 ## Verification Summary
 | ID | Criterion | Method | Status | Evidence |
 |----|-----------|--------|--------|----------|
@@ -472,7 +775,48 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 | AC-052 | When enabled, pushes only changed sessions to Garmin via the… | integration-test | pending | — |
 | AC-053 | Garmin-sourced activity rows are tagged `garmin_api` and exc… | unit-test | pending | — |
 | AC-054 | Go/no-go recorded on 1 Sep 2027 based on developer-programme… | manual-check | pending | — |
+| AC-055 | Weekly volume comes from the athlete's target hours; free ti… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-056 | No session exceeds the race-appropriate cap for its kind (e.… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-057 | A Key session too long for every slot is shortened to the lo… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-058 | After a plan or re-plan the log matches it: unlogged rows fo… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-059 | A re-plan keeps earlier sessions in the stored week and only… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-060 | `init` builds a valid config from plain answers (no YAML kno… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-061 | Plain-English inputs: --week this/next, --injury run[:days|:… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-062 | `log` records done/skipped/moved with minutes, reason and pa… | e2e-test | verified | test_us_014_everyday_usability.py |
+| AC-063 | Declared injuries persist across commands, apply when planni… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-064 | `today` shows today's sessions with plain-English instructio… | e2e-test | verified | test_us_014_everyday_usability.py |
+| AC-065 | `tri-plan web` serves Today, Week, Changed, Progress and Set… | e2e-test | verified | test_us_015_local_web_app.py |
+| AC-066 | The setup form creates and edits the config without YAML; ba… | e2e-test | verified | test_us_015_local_web_app.py |
+| AC-067 | Planning a week from the website writes the same plan, .ics,… | e2e-test | verified | test_us_015_local_web_app.py |
+| AC-068 | From Today or Week: Done (minutes, something hurt, another t… | e2e-test | verified | test_us_015_local_web_app.py |
+| AC-069 | "Something's changed" re-plans from ticked slots, a new or c… | e2e-test | verified | test_us_015_local_web_app.py |
+| AC-070 | Every form needs the page's secret token, so another website… | unit-test | verified | test_us_015_local_web_app.py |
+| AC-071 | A 5k time, swim CSS (or 400m + 200m time trials), FTP and th… | unit-test | verified | test_us_016_personalised_training.py |
+| AC-072 | Base has tempo, sweet-spot and CSS work; build adds threshol… | unit-test | verified | test_us_016_personalised_training.py |
+| AC-073 | Every session is a structured workout (warm-up, main set, co… | integration-test | verified | test_us_016_personalised_training.py |
+| AC-074 | Sessions are fitted into your free slots and aerobic session… | unit-test | verified | test_us_016_personalised_training.py |
+| AC-075 | Across a real season: no hard session on the same day as a l… | e2e-test | verified | test_us_016_personalised_training.py |
+| AC-076 | The profile page asks for current fitness and shows your zon… | e2e-test | verified | test_us_016_personalised_training.py |
+| AC-077 | The experiment is switched on from the Profile page: weeks t… | e2e-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-078 | The season view lists every week to race day with its phase,… | e2e-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-079 | You can move a session to any later slot where its kit is op… | e2e-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-080 | Activity files (.fit, a .zip export, or a folder) tick off t… | integration-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-081 | "Sync from Garmin" uses Garmin's Personal API client with yo… | integration-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-082 | On Today you can sync from Garmin or add activity files; imp… | e2e-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-083 | Profile lets you opt out of strength sessions; none are plan… | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-084 | Opening Today syncs with Garmin in the background at most ev… | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-085 | The recovery check reads last night's sleep, HRV and resting… | unit-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-086 | On a low-recovery day with a quality session planned, Today … | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-087 | Your threshold, max and resting heart rate can be read from … | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-088 | When your watch's average heart rate for an easy session was… | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-089 | Half distance is a race option (Profile and init) with bike-… | e2e-test | verified | test_us_019_half_distance.py |
+| AC-090 | Half sessions go long-course: long rides up to 4h, long runs… | unit-test | verified | test_us_019_half_distance.py |
+| AC-091 | A half week on a school timetable uses double days when it n… | e2e-test | verified | test_us_019_half_distance.py |
+| AC-092 | Planning any week targets the same volume the Season view sh… | e2e-test | verified | test_us_020_season_agrees_and_half_specific.py |
+| AC-093 | Half workouts differ from Olympic ones: race-effort blocks (… | unit-test | verified | test_us_020_season_agrees_and_half_specific.py |
+| AC-094 | A session too long for a slot can run there shortened, down … | unit-test | verified | test_us_021_spread_the_week.py |
+| AC-095 | On a timetable of short weekday slots and long weekends, wee… | e2e-test | verified | test_us_021_spread_the_week.py |
 
-Progress: 27/54 verified — v0 (AC-001–AC-027) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+Progress: 68/95 verified — v0 (AC-001–AC-027, AC-055–AC-095) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
 
 GitHub issue: not created — no repository linked to this session.

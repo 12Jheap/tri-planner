@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Re-planned · tri-planner{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+<div class="head"><div><div class="eyebrow">Week of {{ res.week.strftime('%d %B') }}</div><h1>Re-planned</h1></div></div>
+{% for n in res.notes %}<div class="msg">{{ n }}</div>{% endfor %}
+
+<h2>What changed</h2>
+{% if moves %}
+  <div class="list">
+  {% for m in moves %}
+    <div class="li" style="grid-template-columns: 1fr auto">
+      <div>
+        <span class="sport s-{{ sports.get(m.id, '') }}">{{ sports.get(m.id, '') }}</span>
+        <div class="t">{{ labels.get(m.id, m.id) }}</div>
+        <div class="small muted tnum">{{ m['from'] }} → {{ m.to }}</div>
+      </div>
+      <span class="small muted">{{ m.why|capitalize }}</span>
+    </div>
+  {% endfor %}
+  </div>
+{% else %}
+  <p class="muted">Nothing needed to move. The week still works as it is.</p>
+{% endif %}
+<div class="row" style="margin-top:20px">
+  <a class="btn primary" href="{{ url_for('week_view', w=res.week) }}">See the week</a>
+  <a class="btn" href="{{ url_for('today') }}">Today</a>
+</div>
+<p class="small muted" style="margin-top:12px">Calendar and watch files are updated. Download them again from the week page.</p>
+{% endblock %}

@@ -29,6 +29,7 @@ LOW_RESPONSE = 0.70
 LOG_COLUMNS = [
     "on", "week", "session_id", "discipline", "slot_key", "planned_min",
     "status", "reason", "actual_min", "pain", "source", "week_type",
+    "avg_hr", "avg_power", "distance_m", "activity_id",
 ]
 
 
@@ -45,6 +46,21 @@ class LogRow(BaseModel):
     pain: bool = False
     source: Source = "manual"
     week_type: str = "facility_aware"
+    # Filled in when the session came from a watch file (all optional).
+    avg_hr: int | None = None
+    avg_power: int | None = None
+    distance_m: int | None = None
+    activity_id: str = ""
+
+    @field_validator("avg_hr", "avg_power", "distance_m", mode="before")
+    @classmethod
+    def _blank_metric(cls, v: object) -> object:
+        return None if v in (None, "") else v
+
+    @field_validator("activity_id", mode="before")
+    @classmethod
+    def _blank_id(cls, v: object) -> object:
+        return "" if v is None else v
 
     @field_validator("status", mode="before")
     @classmethod
@@ -104,8 +120,44 @@ def write_log(path: str | Path, rows: Iterable[LogRow], append: bool = False) ->
             d = r.model_dump(mode="json")
             d["status"] = "" if r.status == "no_response" else r.status
             d["pain"] = "yes" if r.pain else ""
-            w.writerow(d)
+            w.writerow({k: "" if v is None else v for k, v in d.items()})
     return out
+
+
+class LogSync(BaseModel):
+    rows: list[LogRow]
+    added: int = 0
+    updated: int = 0
+    removed: int = 0
+
+
+def sync_log(log: list[LogRow], planned: list[LogRow], week: date) -> LogSync:
+    """Bring the log in line with the latest plan for `week`.
+
+    Anything you've already logged is never touched. Unlogged rows follow the
+    plan: moved sessions get their new day/slot, sessions the plan dropped are
+    removed, new sessions are added. Without this, a re-plan leaves stale rows
+    behind and completed ÷ planned hours stops meaning anything.
+    """
+    new_by_id = {r.session_id: r for r in planned}
+    out: list[LogRow] = []
+    seen: set[str] = set()
+    updated = removed = 0
+    for r in log:
+        if r.week != week:
+            out.append(r)
+            continue
+        seen.add(r.session_id)
+        if r.logged:
+            out.append(r)
+        elif r.session_id in new_by_id:
+            fresh = new_by_id[r.session_id].model_copy(update={"source": r.source})
+            updated += fresh.model_dump() != r.model_dump()
+            out.append(fresh)
+        else:
+            removed += 1
+    added = [r for r in planned if r.session_id not in seen]
+    return LogSync(rows=out + added, added=len(added), updated=updated, removed=removed)
 
 
 class AdherenceModel:

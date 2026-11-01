@@ -22,7 +22,7 @@ Two stages:
 
 - Native iOS/Android app, watch app, widgets
 - AI chat coach or LLM-generated plans
-- Long-course (70.3/Ironman) and first-timer onboarding
+- Full Ironman (half distance added in US-019) and first-timer onboarding
 - ML models beyond the Beta-Binomial adherence prior (no LightGBM/PyMC until v2, 1k+ users)
 - HRV-driven automatic changes (v2; v1 readiness is self-reported)
 - Phone health-store sync (a PWA can't read Apple Health / Health Connect)
@@ -97,6 +97,96 @@ Two stages:
 - [ ] Exports structured workouts as .FIT files where the session type supports it
 - [ ] Experiment mode alternates facility-aware and time-only weeks on a fixed schedule
 - [ ] Weekly report shows completion ratio by week type, by slot, and by discipline
+
+### US-014: Everyday usability and sane training load
+**Description:** As an athlete who isn't a programmer, I want to set up, plan, log and re-plan in plain English, and get a training load a coach would sign off, so I keep using it.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] Weekly volume starts from what the athlete trains now and ramps from what they actually did; free time is only a ceiling (build +10%, taper −40%) — amended 1 Nov 2026: no target-hours input
+- [ ] No session exceeds the race-appropriate cap for its kind (e.g. sprint long run ≤ 60')
+- [ ] A Key session too long for every slot is shortened to the longest slot that can host it, with a note, instead of failing the week
+- [ ] After a plan or re-plan the log matches it: unlogged rows follow moves, dropped sessions are removed, logged rows never change
+- [ ] A re-plan keeps earlier sessions in the stored week and only reschedules Key sessions logged as skipped, as Flex catch-ups
+- [ ] `init` builds a valid config from plain answers (no YAML knowledge), and unquoted YAML times like 6:30 load as 06:30
+- [ ] Plain-English inputs: --week this/next, --injury run[:days|:date], --unavailable thu / thu-pm / "thu 16:30" / a date
+- [ ] `log` records done/skipped/moved with minutes, reason and pain, by asking one session at a time or in one line
+- [ ] Declared injuries persist across commands, apply when planning a new week, and can be cleared (which also lifts a pain freeze)
+- [ ] `today` shows today's sessions with plain-English instructions, and the phase is picked from the race date
+
+### US-015: Local web app
+**Description:** As an athlete, I want to plan, log and re-plan from a web page on my laptop or phone instead of the terminal. It's single-athlete and runs on my own computer: no accounts, no hosting, no payments (that's still v1).
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] `tri-plan web` serves Today, Week, Changed, Progress and Setup; with no config the first page is Setup
+- [ ] The setup form creates and edits the config without YAML; bad input is rejected with a reason and the file is left alone; an existing config round-trips unchanged
+- [ ] Planning a week from the website writes the same plan, .ics, .FIT and log as the CLI, and offers the .ics and a .zip of workouts to download
+- [ ] From Today or Week: Done (minutes, something hurt, another time), Skipped with one reason tap, and Undo
+- [ ] "Something's changed" re-plans from ticked slots, a new or cleared injury and flagged sessions, and shows a receipt for every move
+- [ ] Every form needs the page's secret token, so another website open in your browser can't change your plan or log
+
+### US-016: Personalised sessions planned into your availability
+**Description:** As an athlete, I want to say when I'm free and how fit I am now, and get real sessions (tempo, threshold, CSS, bricks) with my own paces, watts and heart rates, fitted into those slots, so the plan feels like it was written for me.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] A 5k time, swim CSS (or 400m + 200m time trials), FTP and threshold or max HR give personal run pace, swim pace, bike power and HR zones that don't overlap; missing numbers fall back to effort; impossible numbers are rejected
+- [ ] Base has tempo, sweet-spot and CSS work; build adds threshold Key sessions plus VO2 and a brick; taper keeps short race-pace openers; every 4th week before the race is a lighter recovery week with no hard sessions
+- [ ] Every session is a structured workout (warm-up, main set, cool-down) that adds up to its planned length, with targets from your zones, and the same steps and targets go into the calendar event and the .FIT file
+- [ ] Sessions are fitted into your free slots and aerobic sessions grow into spare slot time up to the week's budget, never past a session's maximum, the next session, or a facility's opening hours; volume grows from what you train now and what you actually did
+- [ ] Across a real season: no hard session on the same day as a long one, long ride and long run on different days, nothing on race day, and a packed exam week keeps its most valuable sessions instead of failing
+- [ ] The profile page asks for current fitness and shows your zones; each session page shows why, a zone timeline and every step with your targets; the interface uses no emoji
+
+### US-017: Less logging, season view, moving sessions, the experiment
+**Description:** As an athlete, I want my watch to do the logging, to see the whole season to race day, to move a session myself when I know better, and to run the facility-aware experiment from the website, so the 6-week test actually happens.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] The experiment is switched on from the Profile page: weeks then alternate facility-aware / time-only, test weeks are labelled, and the season shows which is which
+- [ ] The season view lists every week to race day with its phase, recovery weeks, holidays and exams, what was planned and done, and the volume the planner is heading for (≤10%/week growth, a ceiling for the distance, never more than free time)
+- [ ] You can move a session to any later slot where its kit is open and there's room; the plan, log and files follow, a logged session can't be moved, and breaking a coaching rule is allowed but flagged
+- [ ] Activity files (.fit, a .zip export, or a folder) tick off the matching planned session: same sport and week, same day = done, other day = moved; a brick's run leg is merged; extras are reported, not forced in; nothing is imported twice and sessions you logged yourself are left alone
+- [ ] "Sync from Garmin" uses Garmin's Personal API client with your key from ~/.config/garmin or GARMIN_PERSONAL_API_KEY, downloads recent activities' original files and ticks off sessions; no key or a refused key gives a plain message; the key is stored readable only by you and never in the project
+- [ ] On Today you can sync from Garmin or add activity files; imported sessions show time, distance and heart rate, and you can still say something hurt
+
+Note: this uses Garmin's **Personal API** (one athlete's own data, pulled with a personal
+key), which fits v0. US-013's push integration via the Training/Health APIs stays v1.
+
+### US-018: Strength opt-out, auto-sync, recovery check, Garmin heart rates, effort check
+**Description:** As an athlete, I want to drop sessions I'll do elsewhere, have Garmin do the syncing without me pressing anything, get a plain recovery check each morning, reuse the heart rates Garmin already knows, and be told when my easy days weren't easy.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] Profile lets you opt out of strength sessions; none are planned and their time goes to swim, bike and run, so the week isn't shorter
+- [ ] Opening Today syncs with Garmin in the background at most every 30 minutes (activities and this morning's recovery data); the time of the last sync is shown, and a failed sync never breaks the page
+- [ ] The recovery check reads last night's sleep, HRV and resting heart rate from Garmin and applies three plain rules (2+ flags = low, 1 = watch, 0 = good); missing data is "not available", never an alarm
+- [ ] On a low-recovery day with a quality session planned, Today offers to make it easy (same time, place and sport, easy effort); nothing changes unless you press it, and logged or already-easy sessions can't be eased
+- [ ] Your threshold, max and resting heart rate can be read from Garmin; they are shown next to your current values and only saved when you tick and confirm, and your zones follow
+- [ ] When your watch's average heart rate for an easy session was above your easy zone, the session says so; hard sessions and sessions without heart rate aren't flagged
+
+Note: the recovery check offers a change and never makes one. It is the athlete's own
+signals, not a diagnosis (no injury or "injury prevention" claims). Plain rules only.
+
+### US-019: Half distance
+**Description:** As an athlete, I want to train for a half (1.9km / 90km / 21.1km) with the volume, long sessions and double days it needs, without the plan getting reckless.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] Half distance is a race option (Profile and init) with bike-heavy splits, more volume (10h default, ramping to a 16h ceiling), a 12-week build, and a clear note that half-iron races need you to be 18
+- [ ] Half sessions go long-course: long rides up to 4h, long runs up to 2h with fuelling notes, a long brick as a Key build session with a proper run off the bike, and race-pace (tempo) work rather than sprint-style VO2
+- [ ] A half week on a school timetable uses double days when it needs to, never two sessions of the same sport in a day (a brick counts as a run), keeps the long ride and long run on different days and puts them at the weekend when the slots allow
+
+Note: added at Joe's request (scope change, 1 Nov 2026). Full Ironman stays out of scope.
+Half-iron races require athletes to be 18 on race day; the app says so where the race is chosen.
+
+### US-020: Season and plan agree; half workouts are race-specific
+**Description:** As an athlete, I want the volume Season shows for a week to be what I get when I plan it, and my half-distance sessions to train half-distance race efforts, not longer Olympic sessions.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] Planning any week targets the same volume the Season view shows for it (one shared rule); weeks planned far ahead say they assume you complete the weeks before, and a past week you didn't log holds volume flat instead of growing it
+- [ ] Half workouts differ from Olympic ones: race-effort blocks (76–83% FTP) in the long ride, a half-marathon-pace finish to the long run, longer CSS reps, long sweet-spot intervals and a brick that runs at half-marathon effort, with the same targets on the watch
+
+### US-021: Sessions fit short slots and the week spreads out
+**Description:** As a student with short school-day slots and long weekends, I want weekday slots used and the weekend not overloaded, so the plan is one I can recover from.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] A session too long for a slot can run there shortened, down to its sensible minimum (a Key session that fits nowhere at all is rescued shorter with a note); full length is used whenever it fits, and the shortened workout still adds up
+- [ ] On a timetable of short weekday slots and long weekends, weekday slots are used, quality sessions go midweek, the long ride and long run take different weekend days, and no weekend day carries two long sessions or more than its fair share plus the long session
 
 ### v1 — MVP web app (only if gates pass)
 

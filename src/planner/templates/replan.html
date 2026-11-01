@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Changes · tri-planner{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+<div class="head">
+  <div>
+    <div class="eyebrow">Week of {{ week.strftime('%d %B') }}</div>
+    <h1>Something's changed?</h1>
+  </div>
+</div>
+<p class="muted" style="max-width:60ch;margin-top:-8px">Say what's different and the rest of the week is re-planned. Only what has to move moves, and you'll see why.</p>
+
+{% if not plan %}
+  <div class="empty" style="margin-top:20px">
+    <h3>This week isn't planned yet</h3>
+    <p><a class="btn primary" href="{{ url_for('week_view') }}">Go to this week</a></p>
+  </div>
+{% else %}
+<form method="post" action="{{ url_for('replan_run') }}" style="margin-top:20px">
+  <input type="hidden" name="token" value="{{ token }}">
+
+  <fieldset>
+    <legend>Slots you can't make</legend>
+    {% for day, items in by_day.items() %}
+      <div class="day-row">
+        <div class="d">{{ day.strftime('%a %d') }}</div>
+        <div>
+          {% for it in items %}
+            <label class="check">
+              <input type="checkbox" name="gone" value="{{ it.uid }}">
+              <span class="tnum">{{ it.slot.start.strftime('%H:%M') }}–{{ it.slot.end.strftime('%H:%M') }}</span>
+              <span class="muted">{{ it.slot.location }}{% if it.planned %} · {{ it.planned|join(', ') }}{% endif %}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+    {% else %}
+      <p class="muted">No slots left this week.</p>
+    {% endfor %}
+  </fieldset>
+
+  <fieldset>
+    <legend>Injury or niggle</legend>
+    <p class="lead">You decide; the planner doesn't diagnose. That sport's load moves to the others until you're back.</p>
+    {% for i in injuries %}
+      <label class="check"><input type="checkbox" name="clear" value="{{ i.discipline }}">
+        I'm back: stop pausing {{ i.discipline }} <span class="muted">(paused until {{ i.until.strftime('%a %d %b') }})</span></label>
+    {% endfor %}
+    <div class="grid" style="margin-top:8px">
+      <label>Pause a sport
+        <select name="injury_sport">
+          <option value="">No new injury</option>
+          <option value="run">Run</option>
+          <option value="bike">Bike</option>
+          <option value="swim">Swim</option>
+        </select>
+      </label>
+      <label>For how many days
+        <input type="number" name="injury_days" min="1" max="60" value="7" inputmode="numeric">
+      </label>
+    </div>
+    <p class="small muted" style="margin-top:12px">Two sessions in a row that hurt pause a sport automatically, and you'll be told to see a physio. Tick "I'm back" once you've been cleared.</p>
+  </fieldset>
+
+  {% if soon %}
+  <fieldset>
+    <legend>Next 24 hours</legend>
+    <p class="lead">These stay put unless you tick them, so nothing moves at the last minute without you asking.</p>
+    {% for p in soon %}
+      <label class="check"><input type="checkbox" name="flag" value="{{ p.session.id }}">
+        Move {{ p.session.title }} <span class="muted tnum">({{ p.slot.on.strftime('%a') }} {{ p.start.strftime('%H:%M') }})</span></label>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+
+  <div class="save-bar"><button class="primary">Re-plan the rest of the week</button></div>
+</form>
+{% endif %}
+{% endblock %}

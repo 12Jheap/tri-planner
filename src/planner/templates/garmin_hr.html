@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Heart rates from Garmin · tri-planner{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+<div class="head"><div><div class="eyebrow">From Garmin Connect</div><h1>Your heart rates</h1></div></div>
+<p class="muted" style="max-width:60ch;margin-top:-8px">These are the values Garmin uses for your zones. Tick the ones to copy into your profile. Nothing changes until you save.</p>
+<form method="post" action="{{ url_for('garmin_hr_apply') }}" style="margin-top:16px">
+  <input type="hidden" name="token" value="{{ token }}">
+  <table class="data">
+    <tr><th></th><th>Garmin</th><th>Your profile now</th></tr>
+    {% for key, label in [('threshold_hr', 'Threshold heart rate'), ('max_hr', 'Max heart rate')] %}
+      {% if key in found %}
+      <tr>
+        <td><label class="check"><input type="checkbox" name="use_{{ key }}" value="1" {{ 'checked' if found[key] != current[key] }}> {{ label }}</label>
+          <input type="hidden" name="{{ key }}" value="{{ found[key] }}"></td>
+        <td class="num">{{ found[key] }} bpm</td>
+        <td class="num muted">{{ (current[key] ~ ' bpm') if current[key] else 'not set' }}</td>
+      </tr>
+      {% endif %}
+    {% endfor %}
+    {% if 'resting_hr' in found %}<tr><td class="muted">Resting heart rate</td><td class="num">{{ found.resting_hr }} bpm</td><td class="muted small">used for the recovery check</td></tr>{% endif %}
+  </table>
+  <div class="row" style="margin-top:16px"><button class="primary">Save to profile</button><a class="btn" href="{{ url_for('setup') }}#garmin">Cancel</a></div>
+</form>
+{% endblock %}
