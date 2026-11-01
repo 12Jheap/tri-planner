@@ -15,7 +15,6 @@ is reported as an extra, not forced onto the plan. Each activity is imported onc
 from __future__ import annotations
 
 import io
-import tempfile
 import zipfile
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -83,10 +82,11 @@ def parse_fit(data: bytes, tz: str = "Europe/London", activity_id: str | None = 
     from fit_tool.fit_file import FitFile
     from fit_tool.profile.messages.session_message import SessionMessage
 
-    with tempfile.NamedTemporaryFile(suffix=".fit") as fh:  # fit_tool reads from a path
-        fh.write(data)
-        fh.flush()
-        fit = FitFile.from_file(fh.name)
+    # Read in memory: a temp file can't be reopened while open on Windows.
+    try:
+        fit = FitFile.from_bytes(data)
+    except Exception:  # noqa: BLE001 (some devices write a bad checksum or padding)
+        fit = FitFile.from_bytes(data, check_crc=False, allow_trailing_bytes=True)
     out: list[Activity] = []
     for rec in fit.records:
         m = rec.message

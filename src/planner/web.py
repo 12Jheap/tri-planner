@@ -279,6 +279,10 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
             res = ws.sync_garmin(fetch=garmin_fetch)
         except garmin.GarminError as err:
             raise PlannerError(str(err)) from None
+        except Exception as err:  # noqa: BLE001 (show it on the page, don't crash)
+            app.logger.exception("Garmin sync failed")
+            raise PlannerError(f"Sync failed ({type(err).__name__}: {err}). Your plan and log "
+                               "are unchanged; the details are in the terminal.") from None
         _import_report(res, "Garmin")
         return redirect(request.form.get("next") or url_for("today"))
 

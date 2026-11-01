@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import re
 import stat
-import tempfile
 import zipfile
 from datetime import date, datetime, timedelta
 from itertools import pairwise
@@ -57,9 +56,7 @@ def make_fit(start: datetime, sport: str, minutes: float, *, km: float | None = 
     b = FitFileBuilder(auto_define=True)
     b.add(fid)
     b.add(s)
-    with tempfile.NamedTemporaryFile(suffix=".fit") as fh:
-        b.build().to_file(fh.name)
-        return Path(fh.name).read_bytes()
+    return b.build().to_bytes()
 
 
 def _joe(tmp_path: Path) -> Workspace:
@@ -246,7 +243,19 @@ def test_ac_080_watch_files_tick_off_the_right_sessions_once(tmp_path):
     out = match_activities([ride, leg], {WEEK: plan}, [])
     assert [m.session_id for m in out.matched] == ["bike-brick"] and not out.extras
     assert isinstance(out.matched[0], Match) and out.matched[0].extra_minutes == 15
-    assert read_bytes("x.fit", make_fit(datetime(2026, 11, 14, 9), "strength", 30), "Europe/London")[0].sport == "strength"
+    strength = make_fit(datetime(2026, 11, 14, 9), "strength", 30)
+    assert read_bytes("x.fit", strength, "Europe/London")[0].sport == "strength"
+
+    # Regression (Windows): reading must not go through a temp file on disk.
+    import tempfile
+
+    def no_temp(*_a, **_k):
+        raise PermissionError("Windows can't reopen an open temp file")
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(tempfile, "NamedTemporaryFile", no_temp)
+        mp.setattr(tempfile, "mkstemp", no_temp)
+        assert read_bytes("x.fit", strength, "Europe/London")
 
     assert cli.main(["import", str(folder), "--config", str(ws.config_path), "--out",
                      str(ws.out)]) == 0  # the terminal route works too
@@ -299,6 +308,14 @@ def test_ac_081_garmin_personal_api_sync(tmp_path, monkeypatch):
     assert row.source == "garmin_personal" and row.actual_min == 41 and row.activity_id.startswith(
         "garmin:98765")
     assert not ws.sync_garmin(days=7).matched  # second sync: nothing new
+
+    broken = io.BytesIO()
+    with zipfile.ZipFile(broken, "w") as z:
+        z.writestr("1_ACTIVITY.fit", b"not a fit file")
+    acts, bad = garmin.fetch_activities(
+        date(2026, 11, 1), date(2026, 11, 15), "Europe/London",
+        fetch=lambda s, e: [("1", broken.getvalue()), ("98765", zipped.getvalue())])
+    assert bad == ["Garmin activity 1"] and len(acts) == 1  # one bad file doesn't stop the rest
 
     class Refused(FakeAuth):
         def obtain_token(self, key):

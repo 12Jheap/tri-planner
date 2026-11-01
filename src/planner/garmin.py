@@ -108,13 +108,21 @@ def download_recent(start: date, end: date, limit: int = 50) -> list[tuple[str, 
 
 
 def fetch_activities(start: date, end: date, tz: str, fetch: Fetcher | None = None
-                     ) -> list[Activity]:
-    """Activities from Garmin Connect between two dates (inclusive)."""
+                     ) -> tuple[list[Activity], list[str]]:
+    """Activities from Garmin Connect between two dates (inclusive).
+
+    Returns (activities, ids of files that couldn't be read): one odd file never
+    stops the rest from syncing.
+    """
     if fetch is None and not key_available():
         raise GarminError(f"No Garmin key yet. Save it on the Profile page, or put it in "
                           f"{KEY_FILE} or the {KEY_ENV} environment variable.")
     files = (fetch or download_recent)(start, end)
     acts: list[Activity] = []
+    bad: list[str] = []
     for aid, data in files:
-        acts += read_bytes(f"{aid}.zip", data, tz, activity_id=f"garmin:{aid}")
-    return acts
+        try:
+            acts += read_bytes(f"{aid}.zip", data, tz, activity_id=f"garmin:{aid}")
+        except Exception:  # noqa: BLE001 (report it, keep going)
+            bad.append(f"Garmin activity {aid}")
+    return acts, bad

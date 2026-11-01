@@ -407,8 +407,10 @@ class Workspace:
 
     def sync_garmin(self, days: int = 14, fetch: Fetcher | None = None) -> ImportResult:
         end = self.now().date()
-        acts = fetch_activities(end - timedelta(days=days), end, self.cfg.timezone, fetch)
-        return self.import_activities(acts, "garmin_personal")
+        acts, bad = fetch_activities(end - timedelta(days=days), end, self.cfg.timezone, fetch)
+        result = self.import_activities(acts, "garmin_personal")
+        result.unreadable = bad
+        return result
 
     # ---- moving a session yourself ---------------------------------------------------
     def move_options(self, week: date, session_id: str, now: datetime) -> list[MoveOption]:
