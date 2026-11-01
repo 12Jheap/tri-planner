@@ -1,0 +1,478 @@
+# Acceptance Contract: Facility-aware triathlon planner
+Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
+
+## Quality Gates
+| Gate | Command | Required |
+|------|---------|----------|
+| tests | `pytest` | yes |
+| lint | `ruff check .` | yes |
+| typecheck | `mypy src` | yes |
+| e2e (v1) | `pytest tests/e2e` | v1 only |
+
+## Acceptance Criteria
+
+### US-001: Constraint model — locations, facilities and slots (v0)
+
+#### AC-001: Accepts a YAML file defining locations, each with facilities (pool, wattbike, treadmill, road bike, gym) and per-facility opening windows (e.g. pool only after 16:00)
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_001_constraint_model_locations_facilities_an.py` > test_ac_001_accepts_a_yaml_file_defining_locations_each_with_facilities_
+- **Status:** verified
+- **Evidence:** `tests/test_us_001_constraint_model_locations_facilities_an.py::test_ac_001_accepts_a_yaml_file_defining_locations_each_with_facilities_` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-002: Accepts a weekly calendar mapping each day to a location and listing available time slots
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_001_constraint_model_locations_facilities_an.py` > test_ac_002_accepts_a_weekly_calendar_mapping_each_day_to_a_location_and
+- **Status:** verified
+- **Evidence:** `tests/test_us_001_constraint_model_locations_facilities_an.py::test_ac_002_accepts_a_weekly_calendar_mapping_each_day_to_a_location_and` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-003: Rejects config with overlapping slots or unknown facility names, with a clear error
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_001_constraint_model_locations_facilities_an.py` > test_ac_003_rejects_config_with_overlapping_slots_or_unknown_facility_na
+- **Status:** verified
+- **Evidence:** `tests/test_us_001_constraint_model_locations_facilities_an.py::test_ac_003_rejects_config_with_overlapping_slots_or_unknown_facility_na` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-004: Supports date-range overrides (holiday block, exam week, travel)
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_001_constraint_model_locations_facilities_an.py` > test_ac_004_supports_date_range_overrides_holiday_block_exam_week_travel
+- **Status:** verified
+- **Evidence:** `tests/test_us_001_constraint_model_locations_facilities_an.py::test_ac_004_supports_date_range_overrides_holiday_block_exam_week_travel` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+### US-002: Load targets and session library (v0)
+
+#### AC-005: Returns weekly minutes per discipline for a sprint or Olympic template given phase (base/build/taper) and available hours
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_002_load_targets_and_session_library.py` > test_ac_005_returns_weekly_minutes_per_discipline_for_a_sprint_or_olympi
+- **Status:** verified
+- **Evidence:** `tests/test_us_002_load_targets_and_session_library.py::test_ac_005_returns_weekly_minutes_per_discipline_for_a_sprint_or_olympi` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-006: Caps week-on-week load increase at a configurable ramp (default 10%)
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_002_load_targets_and_session_library.py` > test_ac_006_caps_week_on_week_load_increase_at_a_configurable_ramp_defau
+- **Status:** verified
+- **Evidence:** `tests/test_us_002_load_targets_and_session_library.py::test_ac_006_caps_week_on_week_load_increase_at_a_configurable_ramp_defau` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-007: Each session has type, duration, intensity, required facilities, and a Key or Flex flag
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_002_load_targets_and_session_library.py` > test_ac_007_each_session_has_type_duration_intensity_required_facilities
+- **Status:** verified
+- **Evidence:** `tests/test_us_002_load_targets_and_session_library.py::test_ac_007_each_session_has_type_duration_intensity_required_facilities` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-008: Session library includes indoor substitutes (wattbike for road bike, treadmill for outdoor run)
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_002_load_targets_and_session_library.py` > test_ac_008_session_library_includes_indoor_substitutes_wattbike_for_roa
+- **Status:** verified
+- **Evidence:** `tests/test_us_002_load_targets_and_session_library.py::test_ac_008_session_library_includes_indoor_substitutes_wattbike_for_roa` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+### US-003: Weekly planner (CP-SAT) (v0)
+
+#### AC-009: Never places a session in a slot whose location lacks its required facility or is outside opening hours (hard constraint)
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_003_weekly_planner_cp_sat.py` > test_ac_009_never_places_a_session_in_a_slot_whose_location_lacks_its_re
+- **Status:** verified
+- **Evidence:** `tests/test_us_003_weekly_planner_cp_sat.py::test_ac_009_never_places_a_session_in_a_slot_whose_location_lacks_its_re` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-010: Never places two hard sessions on consecutive days or a session overlapping another
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_003_weekly_planner_cp_sat.py` > test_ac_010_never_places_two_hard_sessions_on_consecutive_days_or_a_sess
+- **Status:** verified
+- **Evidence:** `tests/test_us_003_weekly_planner_cp_sat.py::test_ac_010_never_places_two_hard_sessions_on_consecutive_days_or_a_sess` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-011: Objective maximises Σ P(complete | slot) × session value
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_003_weekly_planner_cp_sat.py` > test_ac_011_objective_maximises_p_complete_slot_session_value
+- **Status:** verified
+- **Evidence:** `tests/test_us_003_weekly_planner_cp_sat.py::test_ac_011_objective_maximises_p_complete_slot_session_value` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-012: Returns a plan within 10 seconds for a 7-day, 30-slot week
+- **Method:** metric
+- **Test:** `test-stubs/test_us_003_weekly_planner_cp_sat.py` > test_ac_012_returns_a_plan_within_10_seconds_for_a_7_day_30_slot_week
+- **Status:** verified
+- **Evidence:** `tests/test_us_003_weekly_planner_cp_sat.py::test_ac_012_returns_a_plan_within_10_seconds_for_a_7_day_30_slot_week` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-013: Returns "infeasible" with the binding constraint named when targets can't fit
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_003_weekly_planner_cp_sat.py` > test_ac_013_returns_infeasible_with_the_binding_constraint_named_when_ta
+- **Status:** verified
+- **Evidence:** `tests/test_us_003_weekly_planner_cp_sat.py::test_ac_013_returns_infeasible_with_the_binding_constraint_named_when_ta` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+### US-004: Logging and adherence model (v0)
+
+#### AC-014: Reads a Google Sheet (or CSV export) log with planned session ID, status, reason code, actual minutes
+- **Method:** integration-test
+- **Test:** `test-stubs/test_us_004_logging_and_adherence_model.py` > test_ac_014_reads_a_google_sheet_or_csv_export_log_with_planned_session_
+- **Status:** verified
+- **Evidence:** `tests/test_us_004_logging_and_adherence_model.py::test_ac_014_reads_a_google_sheet_or_csv_export_log_with_planned_session_` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-015: Maintains a Beta-Binomial completion estimate per slot (day × time window × location), starting from a configurable prior
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_004_logging_and_adherence_model.py` > test_ac_015_maintains_a_beta_binomial_completion_estimate_per_slot_day_t
+- **Status:** verified
+- **Evidence:** `tests/test_us_004_logging_and_adherence_model.py::test_ac_015_maintains_a_beta_binomial_completion_estimate_per_slot_day_t` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-016: Treats unlogged sessions as censored, not skipped
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_004_logging_and_adherence_model.py` > test_ac_016_treats_unlogged_sessions_as_censored_not_skipped
+- **Status:** verified
+- **Evidence:** `tests/test_us_004_logging_and_adherence_model.py::test_ac_016_treats_unlogged_sessions_as_censored_not_skipped` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-017: Reports weekly completed ÷ planned hours and flags if logging response rate is below 70%
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_004_logging_and_adherence_model.py` > test_ac_017_reports_weekly_completed_planned_hours_and_flags_if_logging_
+- **Status:** verified
+- **Evidence:** `tests/test_us_004_logging_and_adherence_model.py::test_ac_017_reports_weekly_completed_planned_hours_and_flags_if_logging_` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-018: Stores every completion row with a `source` field (manual / file / garmin_personal)
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_004_logging_and_adherence_model.py` > test_ac_018_stores_every_completion_row_with_a_source_field_manual_file_
+- **Status:** verified
+- **Evidence:** `tests/test_us_004_logging_and_adherence_model.py::test_ac_018_stores_every_completion_row_with_a_source_field_manual_file_` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+### US-005: Stable re-planning and injury substitution (v0)
+
+#### AC-019: Freezes sessions in the next 24 hours unless the athlete flags them
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_005_stable_re_planning_and_injury_substituti.py` > test_ac_019_freezes_sessions_in_the_next_24_hours_unless_the_athlete_fla
+- **Status:** verified
+- **Evidence:** `tests/test_us_005_stable_re_planning_and_injury_substituti.py::test_ac_019_freezes_sessions_in_the_next_24_hours_unless_the_athlete_fla` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-020: Penalises churn: a re-plan moves the fewest sessions needed, and every move carries a reason code
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_005_stable_re_planning_and_injury_substituti.py` > test_ac_020_penalises_churn_a_re_plan_moves_the_fewest_sessions_needed_a
+- **Status:** verified
+- **Evidence:** `tests/test_us_005_stable_re_planning_and_injury_substituti.py::test_ac_020_penalises_churn_a_re_plan_moves_the_fewest_sessions_needed_a` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-021: An injury flag on a discipline (e.g. calf → no running for N days) remaps its load to allowed disciplines and records the shortfall in a per-discipline debt ledger
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_005_stable_re_planning_and_injury_substituti.py` > test_ac_021_an_injury_flag_on_a_discipline_e_g_calf_no_running_for_n_day
+- **Status:** verified
+- **Evidence:** `tests/test_us_005_stable_re_planning_and_injury_substituti.py::test_ac_021_an_injury_flag_on_a_discipline_e_g_calf_no_running_for_n_day` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-022: Two consecutive pain reports freeze that discipline and output a "see a physio" message
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_005_stable_re_planning_and_injury_substituti.py` > test_ac_022_two_consecutive_pain_reports_freeze_that_discipline_and_outp
+- **Status:** verified
+- **Evidence:** `tests/test_us_005_stable_re_planning_and_injury_substituti.py::test_ac_022_two_consecutive_pain_reports_freeze_that_discipline_and_outp` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-023: Every plan version is appended (never overwritten) to a `plan_session_version` table
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_005_stable_re_planning_and_injury_substituti.py` > test_ac_023_every_plan_version_is_appended_never_overwritten_to_a_plan_s
+- **Status:** verified
+- **Evidence:** `tests/test_us_005_stable_re_planning_and_injury_substituti.py::test_ac_023_every_plan_version_is_appended_never_overwritten_to_a_plan_s` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+### US-006: Export and experiment report (v0)
+
+#### AC-024: Exports the week as an .ics file with one event per session (title, duration, location, description)
+- **Method:** integration-test
+- **Test:** `test-stubs/test_us_006_export_and_experiment_report.py` > test_ac_024_exports_the_week_as_an_ics_file_with_one_event_per_session_t
+- **Status:** verified
+- **Evidence:** `tests/test_us_006_export_and_experiment_report.py::test_ac_024_exports_the_week_as_an_ics_file_with_one_event_per_session_t` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-025: Exports structured workouts as .FIT files where the session type supports it
+- **Method:** integration-test
+- **Test:** `test-stubs/test_us_006_export_and_experiment_report.py` > test_ac_025_exports_structured_workouts_as_fit_files_where_the_session_t
+- **Status:** verified
+- **Evidence:** `tests/test_us_006_export_and_experiment_report.py::test_ac_025_exports_structured_workouts_as_fit_files_where_the_session_t` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-026: Experiment mode alternates facility-aware and time-only weeks on a fixed schedule
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_006_export_and_experiment_report.py` > test_ac_026_experiment_mode_alternates_facility_aware_and_time_only_week
+- **Status:** verified
+- **Evidence:** `tests/test_us_006_export_and_experiment_report.py::test_ac_026_experiment_mode_alternates_facility_aware_and_time_only_week` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+#### AC-027: Weekly report shows completion ratio by week type, by slot, and by discipline
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_006_export_and_experiment_report.py` > test_ac_027_weekly_report_shows_completion_ratio_by_week_type_by_slot_an
+- **Status:** verified
+- **Evidence:** `tests/test_us_006_export_and_experiment_report.py::test_ac_027_weekly_report_shows_completion_ratio_by_week_type_by_slot_an` (pytest, 30 Oct 2026)
+- **Verified-by:** conductor verification sweep
+
+### US-007: 3-minute onboarding to week-1 preview (v1)
+
+#### AC-028: Onboarding asks only: race + date, 5k/10k time, 100m swim pace, FTP (optional), locations with facilities, weekly slots
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_007_3_minute_onboarding_to_week_1_preview.py` > test_ac_028_onboarding_asks_only_race_date_5k_10k_time_100m_swim_pace_ft
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-029: Displays a full week-1 plan before any paywall or install prompt
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_007_3_minute_onboarding_to_week_1_preview.py` > test_ac_029_displays_a_full_week_1_plan_before_any_paywall_or_install_pr
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-030: Median onboarding time ≤3 minutes in usability tests (n≥5)
+- **Method:** manual-check
+- **Test:** `test-stubs/test_us_007_3_minute_onboarding_to_week_1_preview.py` > test_ac_030_median_onboarding_time_3_minutes_in_usability_tests_n_5
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-031: Offers ready-made location profiles (Work week, Work trip, Home, Family holiday)
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_007_3_minute_onboarding_to_week_1_preview.py` > test_ac_031_offers_ready_made_location_profiles_work_week_work_trip_home
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+### US-008: Today card and logging (v1)
+
+#### AC-032: Today card displays today's sessions with Done / Skipped / Moved buttons at thumb height (≥48px targets)
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_008_today_card_and_logging.py` > test_ac_032_today_card_displays_today_s_sessions_with_done_skipped_moved
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-033: Skipped requires exactly one reason tap (No time / Facility closed / Body / Feeling off)
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_008_today_card_and_logging.py` > test_ac_033_skipped_requires_exactly_one_reason_tap_no_time_facility_clo
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-034: An unlogged session triggers one prompt next morning and is never auto-marked skipped
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_008_today_card_and_logging.py` > test_ac_034_an_unlogged_session_triggers_one_prompt_next_morning_and_is_
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-035: Today card works offline and syncs when back online
+- **Method:** integration-test
+- **Test:** `test-stubs/test_us_008_today_card_and_logging.py` > test_ac_035_today_card_works_offline_and_syncs_when_back_online
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+### US-009: Change receipts and Undo (v1)
+
+#### AC-036: Every automatic change displays a one-line receipt (what moved, why) with Undo
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_009_change_receipts_and_undo.py` > test_ac_036_every_automatic_change_displays_a_one_line_receipt_what_move
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-037: Changes to Key sessions or readiness-driven changes ask for confirmation first
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_009_change_receipts_and_undo.py` > test_ac_037_changes_to_key_sessions_or_readiness_driven_changes_ask_for_
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-038: Tomorrow's sessions lock at 21:00 local time
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_009_change_receipts_and_undo.py` > test_ac_038_tomorrow_s_sessions_lock_at_21_00_local_time
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+### US-010: Reminders and calendar (v1)
+
+#### AC-039: Provides a subscribable .ics feed URL that updates after every re-plan
+- **Method:** integration-test
+- **Test:** `test-stubs/test_us_010_reminders_and_calendar.py` > test_ac_039_provides_a_subscribable_ics_feed_url_that_updates_after_ever
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-040: Offers PWA install only after the week-1 preview, with an iOS Add-to-Home-Screen walkthrough
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_010_reminders_and_calendar.py` > test_ac_040_offers_pwa_install_only_after_the_week_1_preview_with_an_ios
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-041: Sends a web push reminder at a user-chosen time before each session (installed PWA only)
+- **Method:** integration-test
+- **Test:** `test-stubs/test_us_010_reminders_and_calendar.py` > test_ac_041_sends_a_web_push_reminder_at_a_user_chosen_time_before_each_
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+### US-011: Billing (v1)
+
+#### AC-042: Stripe Checkout supports £79.99/yr, £12.99/mo and Founding-250 £59.99/yr, plus USD/EUR equivalents
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_011_billing.py` > test_ac_042_stripe_checkout_supports_79_99_yr_12_99_mo_and_founding_250_
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-043: 14-day trial; cancellation in two taps; no plan is ever stranded within 14 days of a race
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_011_billing.py` > test_ac_043_14_day_trial_cancellation_in_two_taps_no_plan_is_ever_strand
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-044: Free off-season mode keeps the account and history after a subscription lapses
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_011_billing.py` > test_ac_044_free_off_season_mode_keeps_the_account_and_history_after_a_s
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-045: Trial→paid is tracked by segment (student/adult) and sync method (file/Garmin)
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_011_billing.py` > test_ac_045_trial_paid_is_tracked_by_segment_student_adult_and_sync_meth
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+### US-012: Safety, privacy and compliance (v1)
+
+#### AC-046: Rejects sign-up when date of birth gives age under 18
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_012_safety_privacy_and_compliance.py` > test_ac_046_rejects_sign_up_when_date_of_birth_gives_age_under_18
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-047: Collects explicit consent for health data (readiness, injury) separately from terms
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_012_safety_privacy_and_compliance.py` > test_ac_047_collects_explicit_consent_for_health_data_readiness_injury_s
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-048: User can export all their data (JSON/CSV) and delete their account from settings
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_012_safety_privacy_and_compliance.py` > test_ac_048_user_can_export_all_their_data_json_csv_and_delete_their_acc
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-049: Injury input is user-declared only; no copy anywhere claims diagnosis or injury prevention
+- **Method:** e2e-test
+- **Test:** `test-stubs/test_us_012_safety_privacy_and_compliance.py` > test_ac_049_injury_input_is_user_declared_only_no_copy_anywhere_claims_d
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-050: DPIA written and ICO registration done before beta (manual check)
+- **Method:** manual-check
+- **Test:** `test-stubs/test_us_012_safety_privacy_and_compliance.py` > test_ac_050_dpia_written_and_ico_registration_done_before_beta_manual_ch
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+### US-013: Garmin integration (behind a flag) (v1)
+
+#### AC-051: Core loop (plan, log, re-plan) works with the Garmin flag off
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_013_garmin_integration_behind_a_flag.py` > test_ac_051_core_loop_plan_log_re_plan_works_with_the_garmin_flag_off
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-052: When enabled, pushes only changed sessions to Garmin via the Training API after each re-plan
+- **Method:** integration-test
+- **Test:** `test-stubs/test_us_013_garmin_integration_behind_a_flag.py` > test_ac_052_when_enabled_pushes_only_changed_sessions_to_garmin_via_the_
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-053: Garmin-sourced activity rows are tagged `garmin_api` and excluded from pooled cross-user estimates
+- **Method:** unit-test
+- **Test:** `test-stubs/test_us_013_garmin_integration_behind_a_flag.py` > test_ac_053_garmin_sourced_activity_rows_are_tagged_garmin_api_and_exclu
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+#### AC-054: Go/no-go recorded on 1 Sep 2027 based on developer-programme approval
+- **Method:** manual-check
+- **Test:** `test-stubs/test_us_013_garmin_integration_behind_a_flag.py` > test_ac_054_go_no_go_recorded_on_1_sep_2027_based_on_developer_programme
+- **Status:** pending
+- **Evidence:** —
+- **Verified-by:** —
+
+## Verification Summary
+| ID | Criterion | Method | Status | Evidence |
+|----|-----------|--------|--------|----------|
+| AC-001 | Accepts a YAML file defining locations, each with facilities… | unit-test | verified | test_us_001_constraint_model_locations_facilities_an.py |
+| AC-002 | Accepts a weekly calendar mapping each day to a location and… | unit-test | verified | test_us_001_constraint_model_locations_facilities_an.py |
+| AC-003 | Rejects config with overlapping slots or unknown facility na… | unit-test | verified | test_us_001_constraint_model_locations_facilities_an.py |
+| AC-004 | Supports date-range overrides (holiday block, exam week, tra… | unit-test | verified | test_us_001_constraint_model_locations_facilities_an.py |
+| AC-005 | Returns weekly minutes per discipline for a sprint or Olympi… | e2e-test | verified | test_us_002_load_targets_and_session_library.py |
+| AC-006 | Caps week-on-week load increase at a configurable ramp (defa… | unit-test | verified | test_us_002_load_targets_and_session_library.py |
+| AC-007 | Each session has type, duration, intensity, required facilit… | e2e-test | verified | test_us_002_load_targets_and_session_library.py |
+| AC-008 | Session library includes indoor substitutes (wattbike for ro… | unit-test | verified | test_us_002_load_targets_and_session_library.py |
+| AC-009 | Never places a session in a slot whose location lacks its re… | e2e-test | verified | test_us_003_weekly_planner_cp_sat.py |
+| AC-010 | Never places two hard sessions on consecutive days or a sess… | unit-test | verified | test_us_003_weekly_planner_cp_sat.py |
+| AC-011 | Objective maximises Σ P(complete | slot) × session value | unit-test | verified | test_us_003_weekly_planner_cp_sat.py |
+| AC-012 | Returns a plan within 10 seconds for a 7-day, 30-slot week | metric | verified | test_us_003_weekly_planner_cp_sat.py |
+| AC-013 | Returns "infeasible" with the binding constraint named when … | unit-test | verified | test_us_003_weekly_planner_cp_sat.py |
+| AC-014 | Reads a Google Sheet (or CSV export) log with planned sessio… | integration-test | verified | test_us_004_logging_and_adherence_model.py |
+| AC-015 | Maintains a Beta-Binomial completion estimate per slot (day … | unit-test | verified | test_us_004_logging_and_adherence_model.py |
+| AC-016 | Treats unlogged sessions as censored, not skipped | unit-test | verified | test_us_004_logging_and_adherence_model.py |
+| AC-017 | Reports weekly completed ÷ planned hours and flags if loggin… | unit-test | verified | test_us_004_logging_and_adherence_model.py |
+| AC-018 | Stores every completion row with a `source` field (manual / … | unit-test | verified | test_us_004_logging_and_adherence_model.py |
+| AC-019 | Freezes sessions in the next 24 hours unless the athlete fla… | unit-test | verified | test_us_005_stable_re_planning_and_injury_substituti.py |
+| AC-020 | Penalises churn: a re-plan moves the fewest sessions needed,… | unit-test | verified | test_us_005_stable_re_planning_and_injury_substituti.py |
+| AC-021 | An injury flag on a discipline (e.g. calf → no running for N… | unit-test | verified | test_us_005_stable_re_planning_and_injury_substituti.py |
+| AC-022 | Two consecutive pain reports freeze that discipline and outp… | unit-test | verified | test_us_005_stable_re_planning_and_injury_substituti.py |
+| AC-023 | Every plan version is appended (never overwritten) to a `pla… | unit-test | verified | test_us_005_stable_re_planning_and_injury_substituti.py |
+| AC-024 | Exports the week as an .ics file with one event per session … | integration-test | verified | test_us_006_export_and_experiment_report.py |
+| AC-025 | Exports structured workouts as .FIT files where the session … | integration-test | verified | test_us_006_export_and_experiment_report.py |
+| AC-026 | Experiment mode alternates facility-aware and time-only week… | unit-test | verified | test_us_006_export_and_experiment_report.py |
+| AC-027 | Weekly report shows completion ratio by week type, by slot, … | e2e-test | verified | test_us_006_export_and_experiment_report.py |
+| AC-028 | Onboarding asks only: race + date, 5k/10k time, 100m swim pa… | unit-test | pending | — |
+| AC-029 | Displays a full week-1 plan before any paywall or install pr… | e2e-test | pending | — |
+| AC-030 | Median onboarding time ≤3 minutes in usability tests (n≥5) | manual-check | pending | — |
+| AC-031 | Offers ready-made location profiles (Work week, Work trip, H… | e2e-test | pending | — |
+| AC-032 | Today card displays today's sessions with Done / Skipped / M… | e2e-test | pending | — |
+| AC-033 | Skipped requires exactly one reason tap (No time / Facility … | e2e-test | pending | — |
+| AC-034 | An unlogged session triggers one prompt next morning and is … | e2e-test | pending | — |
+| AC-035 | Today card works offline and syncs when back online | integration-test | pending | — |
+| AC-036 | Every automatic change displays a one-line receipt (what mov… | e2e-test | pending | — |
+| AC-037 | Changes to Key sessions or readiness-driven changes ask for … | unit-test | pending | — |
+| AC-038 | Tomorrow's sessions lock at 21:00 local time | unit-test | pending | — |
+| AC-039 | Provides a subscribable .ics feed URL that updates after eve… | integration-test | pending | — |
+| AC-040 | Offers PWA install only after the week-1 preview, with an iO… | e2e-test | pending | — |
+| AC-041 | Sends a web push reminder at a user-chosen time before each … | integration-test | pending | — |
+| AC-042 | Stripe Checkout supports £79.99/yr, £12.99/mo and Founding-2… | e2e-test | pending | — |
+| AC-043 | 14-day trial; cancellation in two taps; no plan is ever stra… | unit-test | pending | — |
+| AC-044 | Free off-season mode keeps the account and history after a s… | unit-test | pending | — |
+| AC-045 | Trial→paid is tracked by segment (student/adult) and sync me… | unit-test | pending | — |
+| AC-046 | Rejects sign-up when date of birth gives age under 18 | unit-test | pending | — |
+| AC-047 | Collects explicit consent for health data (readiness, injury… | unit-test | pending | — |
+| AC-048 | User can export all their data (JSON/CSV) and delete their a… | unit-test | pending | — |
+| AC-049 | Injury input is user-declared only; no copy anywhere claims … | e2e-test | pending | — |
+| AC-050 | DPIA written and ICO registration done before beta (manual c… | manual-check | pending | — |
+| AC-051 | Core loop (plan, log, re-plan) works with the Garmin flag of… | unit-test | pending | — |
+| AC-052 | When enabled, pushes only changed sessions to Garmin via the… | integration-test | pending | — |
+| AC-053 | Garmin-sourced activity rows are tagged `garmin_api` and exc… | unit-test | pending | — |
+| AC-054 | Go/no-go recorded on 1 Sep 2027 based on developer-programme… | manual-check | pending | — |
+
+Progress: 27/54 verified — v0 (AC-001–AC-027) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+
+GitHub issue: not created — no repository linked to this session.
