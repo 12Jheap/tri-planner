@@ -135,6 +135,7 @@ def replan(
     *,
     p_complete: Mapping[str, float] | None = None,
     done_ids: Iterable[str] = (),
+    skipped_ids: Iterable[str] | None = None,
     flagged: Iterable[str] = (),
     unavailable_slots: Iterable[str] = (),
     injuries: Iterable[Injury] = (),
@@ -145,11 +146,15 @@ def replan(
     """Rebuild the rest of the week from `now`.
 
     done_ids: sessions already completed this week.
+    skipped_ids: sessions logged as skipped. Only these past Key sessions get a
+        catch-up; unlogged ones are unknown, not missed. None = treat every past,
+        not-done Key session as missed.
     flagged: sessions you want moved even if they're in the next 24h.
     unavailable_slots: slot uids (see solver.slot_uid) that are no longer possible.
     """
     ledger = ledger or DebtLedger()
     done, flagged_set, gone = set(done_ids), set(flagged), set(unavailable_slots)
+    skipped = None if skipped_ids is None else set(skipped_ids)
     horizon = now + timedelta(hours=24)
     notes: list[str] = []
 
@@ -168,14 +173,21 @@ def replan(
     fixed: dict[str, str] = {}
     to_plan: list[Session] = []
     missed: set[str] = set()
+    planned_ids = {p.session.id for p in previous.placements}
     for p in previous.placements:
         s = p.session
         if s.id in done:
             continue
         if p.starts_at < now:
-            if s.key:  # missed Key session: try to fit it back in
-                to_plan.append(s)
-                missed.add(s.id)
+            was_missed = skipped is None or s.id in skipped
+            if s.key and was_missed and f"{s.id}-redo" not in planned_ids:
+                # Missed Key session: try to fit it back in, under a new id so the
+                # original's log row stays as the record. It goes back in as Flex:
+                # a catch-up is a bonus and must never make the week infeasible.
+                rid = s.id if s.id.endswith("-redo") else f"{s.id}-redo"
+                redo = Session(**{**s.model_dump(exclude={"value"}), "id": rid, "key": False})
+                to_plan.append(redo)
+                missed.add(redo.id)
             continue
         to_plan.append(s)
         uid = slot_uid(p.slot)

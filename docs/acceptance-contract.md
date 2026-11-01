@@ -415,6 +415,78 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 - **Evidence:** —
 - **Verified-by:** —
 
+### US-014: Everyday usability and sane training load (v0)
+
+#### AC-055: Weekly volume comes from the athlete's target hours; free time is only a ceiling (build +10%, taper −40%)
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_055_weekly_volume_comes_from_target_hours_not_free_time
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_055_weekly_volume_comes_from_target_hours_not_free_time` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-056: No session exceeds the race-appropriate cap for its kind (e.g. sprint long run ≤ 60')
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_056_no_session_is_longer_than_its_race_appropriate_cap
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_056_no_session_is_longer_than_its_race_appropriate_cap` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-057: A Key session too long for every slot is shortened to the longest slot that can host it, with a note, instead of failing the week
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_057_key_session_too_long_for_every_slot_is_shortened_not_infeasible
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_057_key_session_too_long_for_every_slot_is_shortened_not_infeasible` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-058: After a plan or re-plan the log matches it: unlogged rows follow moves, dropped sessions are removed, logged rows never change
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_058_log_follows_the_plan_without_touching_logged_rows
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_058_log_follows_the_plan_without_touching_logged_rows` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-059: A re-plan keeps earlier sessions in the stored week and only reschedules Key sessions logged as skipped, as Flex catch-ups
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_059_replan_keeps_history_and_only_redoes_skipped_key_sessions
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_059_replan_keeps_history_and_only_redoes_skipped_key_sessions` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-060: `init` builds a valid config from plain answers (no YAML knowledge), and unquoted YAML times like 6:30 load as 06:30
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_060_init_wizard_builds_a_valid_config_from_plain_answers
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_060_init_wizard_builds_a_valid_config_from_plain_answers` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-061: Plain-English inputs: --week this/next, --injury run[:days|:date], --unavailable thu / thu-pm / "thu 16:30" / a date
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_061_plain_english_week_injury_and_slot_inputs
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_061_plain_english_week_injury_and_slot_inputs` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-062: `log` records done/skipped/moved with minutes, reason and pain, by asking one session at a time or in one line
+- **Method:** e2e-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_062_log_command_records_sessions_interactively_or_in_one_line
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_062_log_command_records_sessions_interactively_or_in_one_line` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-063: Declared injuries persist across commands, apply when planning a new week, and can be cleared (which also lifts a pain freeze)
+- **Method:** unit-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_063_declared_injuries_persist_apply_to_week_and_can_be_cleared
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_063_declared_injuries_persist_apply_to_week_and_can_be_cleared` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-064: `today` shows today's sessions with plain-English instructions, and the phase is picked from the race date
+- **Method:** e2e-test
+- **Test:** `tests/test_us_014_everyday_usability.py` > test_ac_064_today_shows_sessions_with_instructions_and_phase_from_race_date
+- **Status:** verified
+- **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_064_today_shows_sessions_with_instructions_and_phase_from_race_date` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
 ## Verification Summary
 | ID | Criterion | Method | Status | Evidence |
 |----|-----------|--------|--------|----------|
@@ -472,7 +544,17 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 | AC-052 | When enabled, pushes only changed sessions to Garmin via the… | integration-test | pending | — |
 | AC-053 | Garmin-sourced activity rows are tagged `garmin_api` and exc… | unit-test | pending | — |
 | AC-054 | Go/no-go recorded on 1 Sep 2027 based on developer-programme… | manual-check | pending | — |
+| AC-055 | Weekly volume comes from the athlete's target hours; free ti… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-056 | No session exceeds the race-appropriate cap for its kind (e.… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-057 | A Key session too long for every slot is shortened to the lo… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-058 | After a plan or re-plan the log matches it: unlogged rows fo… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-059 | A re-plan keeps earlier sessions in the stored week and only… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-060 | `init` builds a valid config from plain answers (no YAML kno… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-061 | Plain-English inputs: --week this/next, --injury run[:days|:… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-062 | `log` records done/skipped/moved with minutes, reason and pa… | e2e-test | verified | test_us_014_everyday_usability.py |
+| AC-063 | Declared injuries persist across commands, apply when planni… | unit-test | verified | test_us_014_everyday_usability.py |
+| AC-064 | `today` shows today's sessions with plain-English instructio… | e2e-test | verified | test_us_014_everyday_usability.py |
 
-Progress: 27/54 verified — v0 (AC-001–AC-027) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+Progress: 37/64 verified — v0 (AC-001–AC-027, AC-055–AC-064) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
 
 GitHub issue: not created — no repository linked to this session.

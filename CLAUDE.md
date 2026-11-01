@@ -7,7 +7,8 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
 ## Context
 - `docs/design.md` — verdict, positioning, phase plan with go/kill gates
 - `docs/prd.md` — user stories US-001..US-013 (v0 = US-001..006, v1 web app = US-007..013)
-- `docs/acceptance-contract.md` — AC-001..AC-054; AC-001..027 verified
+- `docs/acceptance-contract.md` — AC-001..AC-064; AC-001..027 and AC-055..064 (US-014, v0
+  usability) verified
 - `docs/competitor-research.md` — competitor matrix and sources
 
 ## Scope rules
@@ -19,7 +20,8 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
 
 ## Code
 - `src/planner/`: config, targets, sessions, solver (OR-Tools CP-SAT), adherence,
-  replan, store (append-only JSONL), export (.ics/.FIT), report, cli
+  replan, store (append-only JSONL + injuries), export (.ics/.FIT), report,
+  friendly (plain-English CLI inputs), wizard (`init`), cli
 - Every test is named `test_ac_NNN_...` and maps to a criterion in the contract. Keep that mapping.
 - Example athlete config: `examples/joe.yaml` (holiday/exam dates are placeholders)
 
@@ -27,7 +29,8 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
 ```bash
 pip install -e ".[fit,dev]"
 pytest && ruff check . && mypy src     # all three must pass before committing
-tri-plan week examples/joe.yaml --week 2026-11-09 --phase base
+tri-plan week examples/joe.yaml --week 2026-11-09    # phase auto from race_date
+python -m pytest                                     # if a stray `pytest` binary uses another Python
 ```
 
 ## Style

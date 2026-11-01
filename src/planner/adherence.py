@@ -108,6 +108,42 @@ def write_log(path: str | Path, rows: Iterable[LogRow], append: bool = False) ->
     return out
 
 
+class LogSync(BaseModel):
+    rows: list[LogRow]
+    added: int = 0
+    updated: int = 0
+    removed: int = 0
+
+
+def sync_log(log: list[LogRow], planned: list[LogRow], week: date) -> LogSync:
+    """Bring the log in line with the latest plan for `week`.
+
+    Anything you've already logged is never touched. Unlogged rows follow the
+    plan: moved sessions get their new day/slot, sessions the plan dropped are
+    removed, new sessions are added. Without this, a re-plan leaves stale rows
+    behind and completed ÷ planned hours stops meaning anything.
+    """
+    new_by_id = {r.session_id: r for r in planned}
+    out: list[LogRow] = []
+    seen: set[str] = set()
+    updated = removed = 0
+    for r in log:
+        if r.week != week:
+            out.append(r)
+            continue
+        seen.add(r.session_id)
+        if r.logged:
+            out.append(r)
+        elif r.session_id in new_by_id:
+            fresh = new_by_id[r.session_id].model_copy(update={"source": r.source})
+            updated += fresh.model_dump() != r.model_dump()
+            out.append(fresh)
+        else:
+            removed += 1
+    added = [r for r in planned if r.session_id not in seen]
+    return LogSync(rows=out + added, added=len(added), updated=updated, removed=removed)
+
+
 class AdherenceModel:
     """Beta-Binomial completion estimate per slot key."""
 

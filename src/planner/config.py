@@ -16,6 +16,7 @@ from enum import Enum
 from itertools import pairwise
 from pathlib import Path
 from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 from pydantic import BaseModel, ValidationError, field_validator, model_validator
@@ -44,6 +45,16 @@ def _check_day(day: str) -> str:
     return d
 
 
+def _yaml_time(v: Any) -> Any:
+    """YAML 1.1 reads an unquoted 6:30 as the base-60 number 390. Turn it back into 06:30
+    instead of letting pydantic read it as 390 seconds past midnight."""
+    if isinstance(v, int) and not isinstance(v, bool):
+        if not 0 <= v < 24 * 60:
+            raise ValueError(f"{v} isn't a time; write times in quotes, e.g. \"06:30\"")
+        return time(v // 60, v % 60)
+    return v
+
+
 def minutes_between(start: time, end: time) -> int:
     return (end.hour * 60 + end.minute) - (start.hour * 60 + start.minute)
 
@@ -54,6 +65,8 @@ class Window(BaseModel):
     start: time
     end: time
     days: list[str] | None = None
+
+    _times = field_validator("start", "end", mode="before")(_yaml_time)
 
     @field_validator("days")
     @classmethod
@@ -104,6 +117,8 @@ class Slot(BaseModel):
     end: time
     location: str
     on: date | None = None  # filled in by calendar_for_week
+
+    _times = field_validator("start", "end", mode="before")(_yaml_time)
 
     @field_validator("day")
     @classmethod
@@ -161,10 +176,28 @@ class AthleteConfig(BaseModel):
     athlete: str
     race: Literal["sprint", "olympic"]
     race_date: date | None = None
+    weekly_hours: float | None = None  # base-phase training hours you're aiming for
+    timezone: str = "Europe/London"
     locations: list[Location]
     templates: dict[str, WeekTemplate]
     default_template: str
     overrides: list[Override] = []
+
+    @field_validator("weekly_hours")
+    @classmethod
+    def _hours(cls, v: float | None) -> float | None:
+        if v is not None and not 1 <= v <= 30:
+            raise ValueError(f"weekly_hours {v} looks wrong (expected 1–30)")
+        return v
+
+    @field_validator("timezone")
+    @classmethod
+    def _tz(cls, v: str) -> str:
+        try:
+            ZoneInfo(v)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ValueError(f"unknown timezone '{v}' (e.g. Europe/London)") from None
+        return v
 
     @model_validator(mode="after")
     def _references(self) -> AthleteConfig:
@@ -218,8 +251,15 @@ def parse_config(data: dict[str, Any]) -> AthleteConfig:
 
 
 def load_config(path: str | Path) -> AthleteConfig:
-    with open(path, encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = yaml.safe_load(fh)
+    except FileNotFoundError:
+        raise ConfigError(
+            f"no config at {path}. Run `tri-plan init` to create one, or pass the path."
+        ) from None
+    except yaml.YAMLError as err:
+        raise ConfigError(f"{path} isn't valid YAML: {err}") from None
     if not isinstance(data, dict):
         raise ConfigError(f"{path}: expected a mapping at the top level")
     return parse_config(data)

@@ -98,6 +98,21 @@ Two stages:
 - [ ] Experiment mode alternates facility-aware and time-only weeks on a fixed schedule
 - [ ] Weekly report shows completion ratio by week type, by slot, and by discipline
 
+### US-014: Everyday usability and sane training load
+**Description:** As an athlete who isn't a programmer, I want to set up, plan, log and re-plan in plain English, and get a training load a coach would sign off, so I keep using it.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] Weekly volume comes from the athlete's target hours; free time is only a ceiling (build +10%, taper −40%)
+- [ ] No session exceeds the race-appropriate cap for its kind (e.g. sprint long run ≤ 60')
+- [ ] A Key session too long for every slot is shortened to the longest slot that can host it, with a note, instead of failing the week
+- [ ] After a plan or re-plan the log matches it: unlogged rows follow moves, dropped sessions are removed, logged rows never change
+- [ ] A re-plan keeps earlier sessions in the stored week and only reschedules Key sessions logged as skipped, as Flex catch-ups
+- [ ] `init` builds a valid config from plain answers (no YAML knowledge), and unquoted YAML times like 6:30 load as 06:30
+- [ ] Plain-English inputs: --week this/next, --injury run[:days|:date], --unavailable thu / thu-pm / "thu 16:30" / a date
+- [ ] `log` records done/skipped/moved with minutes, reason and pain, by asking one session at a time or in one line
+- [ ] Declared injuries persist across commands, apply when planning a new week, and can be cleared (which also lifts a pain freeze)
+- [ ] `today` shows today's sessions with plain-English instructions, and the phase is picked from the race date
+
 ### v1 — MVP web app (only if gates pass)
 
 ### US-007: 3-minute onboarding to week-1 preview

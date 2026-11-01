@@ -3,6 +3,8 @@
 athlete: Joe
 race: sprint
 race_date: 2027-06-27
+weekly_hours: 8            # base-phase target; build adds ~10%, taper cuts ~40%
+timezone: Europe/London
 
 locations:
   - name: School

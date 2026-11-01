@@ -24,7 +24,7 @@ from ortools.sat.python import cp_model
 from pydantic import BaseModel
 
 from planner.config import AthleteConfig, Slot, minutes_between
-from planner.sessions import Session
+from planner.sessions import MIN_SESSION, Session
 
 DEFAULT_P = 0.75
 SCALE = 1000
@@ -89,6 +89,41 @@ def _earliest_offset(s: Session, slot: Slot, config: AthleteConfig, facility_awa
         if s.fits(loc, slot.day, start, _add(start, s.duration_min)):
             return off
     return None
+
+
+def fit_to_slots(
+    sessions: list[Session], slots: list[Slot], config: AthleteConfig, facility_aware: bool = True
+) -> tuple[list[Session], list[str]]:
+    """Shorten any Key session too long for every slot it could use this week.
+
+    A 2h long ride in a week whose longest bike slot is 90' becomes a 90' long
+    ride, instead of making the whole week infeasible. Returns (sessions, notes).
+    Sessions nothing can host at any length are left alone for the solver to report.
+    """
+    out: list[Session] = []
+    notes: list[str] = []
+    for s in sessions:
+        hosts = any(_earliest_offset(s, k, config, facility_aware) is not None for k in slots)
+        if hosts or not s.key:
+            out.append(s)
+            continue
+        best = None
+        for mins in range(s.duration_min - 5, MIN_SESSION - 1, -5):
+            trial = s.model_copy(update={"duration_min": mins})
+            if any(_earliest_offset(trial, k, config, facility_aware) is not None for k in slots):
+                best = mins
+                break
+        if best is None:
+            out.append(s)
+            continue
+        data = s.model_dump(exclude={"value"})
+        data["duration_min"] = best
+        out.append(Session(**data))
+        notes.append(
+            f"{s.discipline.title()} {s.kind.replace('_', ' ')} shortened {s.duration_min}' → "
+            f"{best}': that's the longest slot this week with {_needs(s)}."
+        )
+    return out, notes
 
 
 def _needs(s: Session) -> str:

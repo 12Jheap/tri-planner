@@ -11,9 +11,56 @@ import json
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 
+from planner.adherence import LogRow
 from planner.config import Slot
+from planner.replan import Injury
 from planner.sessions import Session
 from planner.solver import Placement, Plan, slot_uid
+
+
+class InjuryStore:
+    """Declared injuries, remembered between commands (out/injuries.json).
+
+    You say it once (`--injury run:10`); every plan and re-plan respects it until
+    it runs out or you clear it. The athlete declares; the planner never diagnoses.
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+
+    def _data(self) -> dict:
+        if not self.path.exists():
+            return {"injuries": [], "cleared": {}}
+        return json.loads(self.path.read_text("utf-8"))
+
+    def load(self) -> list[Injury]:
+        return [Injury.model_validate(d) for d in self._data()["injuries"]]
+
+    def active(self, on: date) -> list[Injury]:
+        return [i for i in self.load() if i.active(on)]
+
+    def cleared(self) -> dict[str, date]:
+        """Sport -> date you said you were back; pain reports before it no longer count."""
+        return {d: date.fromisoformat(v) for d, v in self._data()["cleared"].items()}
+
+    def declare(self, new: list[Injury], clear: list[str], today: date) -> list[Injury]:
+        """Add/replace by discipline, drop cleared and expired ones; returns active list."""
+        data = self._data()
+        keep = {i.discipline: i for i in self.load() if i.active(today)}
+        for d in clear:
+            keep.pop(d, None)
+            data["cleared"][d] = today.isoformat()
+        for i in new:
+            keep[i.discipline] = i
+        data["injuries"] = [i.model_dump(mode="json") for i in keep.values()]
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        return list(keep.values())
+
+    def pain_rows(self, rows: list[LogRow]) -> list[LogRow]:
+        """Log rows that still count towards a pain freeze (after any clearance)."""
+        cleared = self.cleared()
+        return [r for r in rows if r.on > cleared.get(r.discipline, date.min)]
 
 
 class PlanStore:

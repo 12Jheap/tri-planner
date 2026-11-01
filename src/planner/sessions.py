@@ -28,6 +28,49 @@ REQUIRES: dict[str, list[list[Facility]]] = {
 MIN_SESSION = 20  # minutes; shorter fragments are dropped
 MAX_EASY = 75  # split easy volume into sessions no longer than this
 
+# Longest sensible session (minutes) by race, discipline and kind. Sprint racing is
+# ~1h15 total with a 5k run, so a 2h long run builds nothing but fatigue.
+# Anything above the cap spills into extra Flex sessions instead.
+CAPS: dict[str, dict[str, dict[str, int]]] = {
+    "sprint": {
+        "swim": {"technique": 60, "threshold": 60, "race_pace": 45, "endurance": 60},
+        "bike": {"long": 120, "threshold": 75, "openers": 45, "endurance": 75},
+        "run": {"long": 60, "threshold": 50, "openers": 30, "easy": 45},
+    },
+    "olympic": {
+        "swim": {"technique": 70, "threshold": 75, "race_pace": 50, "endurance": 70},
+        "bike": {"long": 150, "threshold": 90, "openers": 60, "endurance": 90},
+        "run": {"long": 80, "threshold": 60, "openers": 35, "easy": 50},
+    },
+}
+
+
+def cap_for(race: str, discipline: str, kind: str) -> int:
+    return CAPS.get(race, CAPS["sprint"]).get(discipline, {}).get(kind, MAX_EASY)
+
+
+# What to actually do, in plain words. Effort uses a 1–5 scale you can feel:
+# 1–2 = can chat in full sentences, 3 = short phrases, 4 = a few words, 5 = flat out.
+HOW: dict[str, str] = {
+    "technique": "Drills plus easy swimming: catch, body position, breathing both sides. "
+    "Rest as long as you need between lengths.",
+    "endurance": "Steady and relaxed: you could hold a conversation.",
+    "easy": "Genuinely easy, chatty pace. If in doubt, slow down.",
+    "long": "Your longest of the week at an easy, steady effort. Take a drink; "
+    "eat something if it's over 90 minutes.",
+    "threshold": "After the warm-up: repeats at 'comfortably hard' (effort 4/5) with "
+    "short easy recoveries. The .FIT file has the reps.",
+    "race_pace": "Short efforts at race pace with full recovery. Stay sharp, not tired.",
+    "openers": "Mostly easy with a few 30–60 second race-pace pickups. Finish feeling fresh.",
+    "strength": "Bodyweight circuit: squats, lunges, glute bridges, plank, press-ups, "
+    "calf raises. 2–3 rounds, stop before form breaks.",
+    "substitute": "Stands in for a session you can't do right now. Keep it easy to steady.",
+}
+
+
+def how_to(s: Session) -> str:
+    return HOW.get(s.kind, "Steady effort.")
+
 
 class Session(BaseModel):
     id: str
@@ -98,7 +141,7 @@ REMAINDER_KIND = {"swim": "endurance", "bike": "endurance", "run": "easy"}
 
 
 def build_week_sessions(targets: dict[str, int], race: Race, phase: Phase) -> list[Session]:
-    """Concrete sessions for the week. `race` is kept for future race-specific tweaks."""
+    """Concrete sessions for the week, each capped at a race-appropriate length."""
     sessions: list[Session] = []
     for disc in ("swim", "bike", "run"):
         total = targets.get(disc, 0)
@@ -106,7 +149,7 @@ def build_week_sessions(targets: dict[str, int], race: Race, phase: Phase) -> li
             continue
         used = 0
         for kind, intensity, share, key in PLAN[disc][phase]:
-            mins = _round5(total * share)
+            mins = min(_round5(total * share), cap_for(race, disc, kind))
             if mins < MIN_SESSION:
                 continue
             sessions.append(
@@ -121,9 +164,8 @@ def build_week_sessions(targets: dict[str, int], race: Race, phase: Phase) -> li
                 )
             )
             used += mins
-        max_len = 60 if disc == "swim" else MAX_EASY
-        for i, mins in enumerate(_split(total - used, max_len), start=1):
-            kind = REMAINDER_KIND[disc]
+        kind = REMAINDER_KIND[disc]
+        for i, mins in enumerate(_split(total - used, cap_for(race, disc, kind)), start=1):
             sessions.append(
                 Session(
                     id=f"{disc}-{kind}-{i}",

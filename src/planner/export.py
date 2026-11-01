@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 from icalendar import Calendar, Event
 
+from planner.sessions import how_to
 from planner.solver import Placement, Plan
 
 FIT_SPORTS = {"swim", "bike", "run"}
@@ -22,6 +23,7 @@ def _describe(p: Placement) -> str:
     s = p.session
     lines = [
         f"{s.kind.replace('_', ' ').title()} — {s.duration_min} min, intensity {s.intensity}/5",
+        how_to(s),
         "KEY session (protected)" if s.key else "Flex session (moves first if life happens)",
         f"Needs: {', '.join('/'.join(f.value for f in g) for g in s.requires) or 'nothing'}",
     ]
@@ -135,6 +137,8 @@ def export_week(plan: Plan, out_dir: str | Path, tz: str = "Europe/London") -> d
     """Write plan.ics plus one .FIT per supported session into `out_dir`."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    for old in out.glob("*.fit"):  # a re-plan must not leave workouts for moved sessions
+        old.unlink()
     ics = to_ics(plan, out / "plan.ics", tz)
     fits = []
     for p in plan.placements:
