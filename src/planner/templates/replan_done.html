@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Re-planned · tri-planner{% endblock %}
+{% block body %}
+<h1>Re-planned</h1>
+{% for n in res.notes %}<div class="flash info">{{ n }}</div>{% endfor %}
+
+<div class="panel">
+  {% if moves %}
+    <h2 style="margin-top:0">What changed</h2>
+    {% for m in moves %}
+      <div class="receipt">
+        <span>{{ icon.get(sports.get(m.id), '•') }}</span>
+        <span><strong>{{ labels.get(m.id, m.id) }}</strong>: {{ m['from'] }} → {{ m.to }}</span>
+        <span class="why">{{ m.why|capitalize }}</span>
+      </div>
+    {% endfor %}
+  {% else %}
+    <h2 style="margin-top:0">Nothing needed to move</h2>
+    <p class="muted">Your week still works as it is.</p>
+  {% endif %}
+</div>
+<div class="actions">
+  <a class="btn primary" href="{{ url_for('week_view', w=res.week) }}">See the week</a>
+  <a class="btn" href="{{ url_for('today') }}">Today</a>
+</div>
+<p class="small muted">Calendar and watch files have been updated. Re-download them from the week page.</p>
+{% endblock %}

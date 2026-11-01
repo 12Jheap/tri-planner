@@ -113,6 +113,17 @@ Two stages:
 - [ ] Declared injuries persist across commands, apply when planning a new week, and can be cleared (which also lifts a pain freeze)
 - [ ] `today` shows today's sessions with plain-English instructions, and the phase is picked from the race date
 
+### US-015: Local web app
+**Description:** As an athlete, I want to plan, log and re-plan from a web page on my laptop or phone instead of the terminal. It's single-athlete and runs on my own computer: no accounts, no hosting, no payments (that's still v1).
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] `tri-plan web` serves Today, Week, Changed, Progress and Setup; with no config the first page is Setup
+- [ ] The setup form creates and edits the config without YAML; bad input is rejected with a reason and the file is left alone; an existing config round-trips unchanged
+- [ ] Planning a week from the website writes the same plan, .ics, .FIT and log as the CLI, and offers the .ics and a .zip of workouts to download
+- [ ] From Today or Week: Done (minutes, something hurt, another time), Skipped with one reason tap, and Undo
+- [ ] "Something's changed" re-plans from ticked slots, a new or cleared injury and flagged sessions, and shows a receipt for every move
+- [ ] Every form needs the page's secret token, so another website open in your browser can't change your plan or log
+
 ### v1 — MVP web app (only if gates pass)
 
 ### US-007: 3-minute onboarding to week-1 preview

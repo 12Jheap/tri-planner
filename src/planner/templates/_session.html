@@ -1,0 +1,67 @@
+{% macro session(c, next, compact=False) %}
+{% set p = c.p %}{% set s = p.session %}{% set row = c.row %}
+<article class="session sport-{{ s.discipline }}{{ ' compact' if compact }}{{ ' logged-' ~ row.status if row }}" id="s-{{ s.id }}">
+  <div class="session-head">
+    <span class="sport" aria-hidden="true">{{ icon[s.discipline] }}</span>
+    <div class="title">
+      <h3>{{ s.discipline|title }}{{ ' ' ~ s.kind|replace('_', ' ') if s.kind != s.discipline }}
+        <span class="dur">· {{ fmt_min(s.duration_min) }}</span></h3>
+      <p class="meta">{{ p.start.strftime('%H:%M') }}–{{ p.end.strftime('%H:%M') }} · {{ p.slot.location }}</p>
+    </div>
+    {% if s.key %}<span class="badge" title="Key sessions are protected when the week changes">Key</span>{% endif %}
+  </div>
+  {% if not compact %}
+    <p class="how">{{ how_to(s) }}</p>
+    <p class="effort">Effort <span class="dots" aria-label="{{ s.intensity }} out of 5">{{ '●' * s.intensity }}{{ '○' * (5 - s.intensity) }}</span>
+      {{ {1: 'very easy', 2: 'easy, chatty', 3: 'steady, short sentences', 4: 'hard, a few words', 5: 'flat out'}[s.intensity] }}</p>
+  {% endif %}
+  {% if p.reason %}<p class="moved">Moved: {{ p.reason|replace('_', ' ') }}</p>{% endif %}
+  {% if not p.facility_ok %}<p class="moved">⚠ Time-only test week: the kit may not be here.</p>{% endif %}
+
+  {% if row %}
+    <form method="post" action="{{ url_for('log') }}" class="status {{ 'done' if row.status in ('done', 'moved') else 'skipped' }}">
+      <span>
+        {% if row.status in ('done', 'moved') %}✓ Done · {{ row.actual_min }} min{{ ' (another time)' if row.status == 'moved' }}{{ ' · hurt' if row.pain }}
+        {% else %}✗ Skipped · {{ reasons.get(row.reason, row.reason) }}{% endif %}
+      </span>
+      <input type="hidden" name="token" value="{{ token }}">
+      <input type="hidden" name="week" value="{{ c.week }}">
+      <input type="hidden" name="session" value="{{ s.id }}">
+      <input type="hidden" name="next" value="{{ next }}#s-{{ s.id }}">
+      <button class="ghost" name="action" value="undo">Undo</button>
+    </form>
+  {% elif c.loggable %}
+    <div class="log-actions">
+      <details>
+        <summary class="btn primary">✓ Done it</summary>
+        <form method="post" action="{{ url_for('log') }}" class="log-form">
+          <input type="hidden" name="token" value="{{ token }}">
+          <input type="hidden" name="week" value="{{ c.week }}">
+          <input type="hidden" name="session" value="{{ s.id }}">
+          <input type="hidden" name="next" value="{{ next }}#s-{{ s.id }}">
+          <label>Minutes
+            <input type="number" name="minutes" min="0" max="600" inputmode="numeric" value="{{ s.duration_min }}">
+          </label>
+          <label class="check"><input type="checkbox" name="pain" value="1"> Something hurt</label>
+          <label class="check"><input type="checkbox" name="other_time" value="1"> I did it at a different time</label>
+          <button class="primary" name="action" value="done">Save</button>
+        </form>
+      </details>
+      <details>
+        <summary class="btn">Skipped</summary>
+        <form method="post" action="{{ url_for('log') }}" class="log-form">
+          <input type="hidden" name="token" value="{{ token }}">
+          <input type="hidden" name="week" value="{{ c.week }}">
+          <input type="hidden" name="session" value="{{ s.id }}">
+          <input type="hidden" name="next" value="{{ next }}#s-{{ s.id }}">
+          <input type="hidden" name="action" value="skipped">
+          <span class="small muted">Why? One tap:</span>
+          <div class="pills">
+            {% for key, text in reasons.items() %}<button name="reason" value="{{ key }}">{{ text }}</button>{% endfor %}
+          </div>
+        </form>
+      </details>
+    </div>
+  {% endif %}
+</article>
+{% endmacro %}

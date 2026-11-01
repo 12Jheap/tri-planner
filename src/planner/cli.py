@@ -1,5 +1,6 @@
 """Command line. The weekly loop:
 
+    tri-plan web                       # the same thing in your browser (and phone)
     tri-plan init                      # answer a few questions -> athlete.yaml
     tri-plan week                      # plan next week (Sunday evening)
     tri-plan today                     # what's on today, and how to do it
@@ -8,6 +9,7 @@
     tri-plan report
 
 Every command uses ./athlete.yaml and ./out unless you pass a config path / --out.
+All the real work happens in planner.service, shared with the website.
 """
 
 from __future__ import annotations
@@ -15,29 +17,25 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Callable
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from planner.adherence import (
-    LOW_RESPONSE,
-    REASONS,
-    AdherenceModel,
-    LogRow,
-    read_log,
-    sync_log,
-    weekly_summaries,
-    write_log,
+from planner.adherence import REASONS, LogRow, read_log
+from planner.config import AthleteConfig, ConfigError
+from planner.friendly import parse_injury, parse_week
+from planner.report import weekly_report
+from planner.service import (
+    PlannerError,
+    Workspace,
+    placements_on,
+    plan_markdown,
+    slot_label,
+    status_text,
 )
-from planner.config import AthleteConfig, ConfigError, calendar_for_week, load_config
-from planner.export import export_week
-from planner.friendly import parse_injury, parse_week, resolve_slots
-from planner.replan import DebtLedger, frozen_by_pain, replan, substitute
-from planner.report import week_type, weekly_report
-from planner.sessions import build_week_sessions, how_to
-from planner.solver import Placement, Plan, fit_to_slots, plan_week
-from planner.store import InjuryStore, PlanStore
-from planner.targets import DEFAULT_HOURS, describe_targets, phase_for, weekly_targets
+from planner.sessions import how_to
+from planner.solver import Placement
+from planner.targets import describe_targets
 from planner.wizard import run_wizard, to_yaml
 
 DEFAULT_CONFIG = "athlete.yaml"
@@ -49,79 +47,12 @@ def _now(cfg: AthleteConfig) -> datetime:
     return datetime.now(ZoneInfo(cfg.timezone)).replace(tzinfo=None)
 
 
-def _load_log(path: Path) -> list[LogRow]:
-    return read_log(path) if path.exists() else []
+def _ws(a: argparse.Namespace) -> Workspace:
+    return Workspace(a.config or DEFAULT_CONFIG, a.out, (a.prior_alpha, a.prior_beta))
 
 
-def _week(a: argparse.Namespace, cfg: AthleteConfig, default: str) -> date:
-    return parse_week(a.week or default, _now(cfg).date())
-
-
-def _status_cell(row: LogRow | None) -> str:
-    if row is None or not row.logged:
-        return ""
-    mark = {"done": "✓", "moved": "✓", "skipped": "✗"}.get(row.status, "")
-    extra = f" {row.actual_min}'" if row.status in ("done", "moved") else f" {row.reason}".rstrip()
-    return f"{mark} {row.status}{extra}{' · pain' if row.pain else ''}"
-
-
-def _markdown(plan: Plan, title: str, log: dict[str, LogRow] | None = None) -> str:
-    status = log is not None
-    head = "| Day | Time | Where | Session | Note |" + (" Logged |" if status else "")
-    lines = [f"# {title}", "", head, "|---" * (6 if status else 5) + "|"]
-    for p in plan.placements:
-        note = p.reason.replace("_", " ") if p.reason else ""
-        if not p.facility_ok:
-            note = "⚠ no facility (time-only week)"
-        row = (
-            f"| {p.slot.on:%a %d %b} | {p.start:%H:%M}–{p.end:%H:%M} | {p.slot.location} "
-            f"| {p.session.label} | {note} |"
-        )
-        if log is not None:
-            row += f" {_status_cell(log.get(p.session.id))} |"
-        lines.append(row)
-    if plan.dropped:
-        lines += ["", "Didn't fit this week: " + ", ".join(s.id for s in plan.dropped)]
-    lines += ["", f"Planned: {plan.planned_minutes / 60:.1f}h", "", "## How to do each session", ""]
-    for kind in dict.fromkeys(p.session.kind for p in plan.placements):
-        s = next(p.session for p in plan.placements if p.session.kind == kind)
-        lines.append(f"- **{kind.replace('_', ' ')}**: {how_to(s)}")
-    lines += ["", "Effort is out of 5: 2 = chatty, 3 = short sentences, 4 = a few words."]
-    return "\n".join(lines)
-
-
-def _log_rows(plan: Plan, week: date, wtype: str) -> list[LogRow]:
-    return [
-        LogRow(
-            on=p.slot.on, week=week, session_id=p.session.id, discipline=p.session.discipline,
-            slot_key=p.slot.key, planned_min=p.session.duration_min, week_type=wtype,
-        )
-        for p in plan.placements
-        if p.slot.on is not None
-    ]
-
-
-def _save(
-    cfg: AthleteConfig, plan: Plan, week: date, out: Path, note: str, title: str, wtype: str
-) -> tuple[int, dict[str, list[Path]], str]:
-    """Write files, append the plan version and sync the log. Returns a log summary."""
-    wk_dir = out / str(week)
-    files = export_week(plan, wk_dir, cfg.timezone)
-    version = PlanStore(out / "plan_session_version.jsonl").append(plan, week, note)
-    (wk_dir / "plan.md").write_text(_markdown(plan, f"{title} (v{version})"), encoding="utf-8")
-    log_path = out / "log.csv"
-    synced = sync_log(_load_log(log_path), _log_rows(plan, week, wtype), week)
-    write_log(log_path, synced.rows)
-    summary = f"log: {synced.added} added, {synced.updated} moved, {synced.removed} removed"
-    return version, files, summary
-
-
-def _previous_minutes(log: list[LogRow], week: date) -> int | None:
-    """What you actually did last week, if you logged enough of it to trust."""
-    last = [s for s in weekly_summaries(log) if s.week == week - timedelta(days=7)]
-    if not last or last[0].completed_min <= 0 or last[0].response_rate < LOW_RESPONSE:
-        return None
-    return last[0].completed_min
+def _week(a: argparse.Namespace, ws: Workspace, default: str) -> date:
+    return parse_week(a.week or default, _now(ws.cfg).date())
 
 
 def cmd_init(a: argparse.Namespace, ask: Ask | None = None) -> int:
@@ -133,87 +64,37 @@ def cmd_init(a: argparse.Namespace, ask: Ask | None = None) -> int:
     data = run_wizard(ask, print)
     header = "# Made by `tri-plan init`. Edit freely: add templates/overrides for holidays.\n"
     path.write_text(header + to_yaml(data), encoding="utf-8")
-    print(f"\nSaved {path}. Next: tri-plan week")
+    print(f"\nSaved {path}. Next: tri-plan week  (or tri-plan web)")
     return 0
 
 
 def cmd_week(a: argparse.Namespace) -> int:
-    cfg = load_config(a.config or DEFAULT_CONFIG)
-    week = _week(a, cfg, "next")
-    out = Path(a.out)
-    out.mkdir(parents=True, exist_ok=True)
-    log = _load_log(out / "log.csv")
-    phase = a.phase or phase_for(week, cfg.race_date)
-
-    slots = calendar_for_week(cfg, week)
-    if not slots:
-        print(f"No free time in the week of {week}: add slots to your config.", file=sys.stderr)
-        return 2
-    available = sum(s.minutes for s in slots)
-    prev = a.prev_minutes if a.prev_minutes is not None else _previous_minutes(log, week)
-    hours = cfg.weekly_hours or DEFAULT_HOURS[cfg.race]
-    targets = weekly_targets(cfg.race, phase, available, prev, a.ramp, weekly_hours=hours)
-    wtype = week_type(week, a.experiment_start)
-    aware = wtype == "facility_aware"
-    sessions, notes = fit_to_slots(build_week_sessions(targets, cfg.race, phase), slots, cfg, aware)
-    istore = InjuryStore(out / "injuries.json")
-    pain = frozen_by_pain(istore.pain_rows(log))
-    injured = {i.discipline: i for i in istore.active(week)}
-    if pain or injured:
-        ledger = DebtLedger()
-        sessions, _ = substitute(sessions, set(pain) | set(injured), ledger)
-        notes += list(pain.values())
-        notes += [f"{d} paused until {i.until:%a %d %b} (declared injury); its load moved to "
-                  f"other sports. Re-plan with --clear-injury {d} when you're back."
-                  for d, i in injured.items()]
-    model = AdherenceModel(a.prior_alpha, a.prior_beta).update(log)
-
-    plan = plan_week(
-        sessions, slots, cfg, model.probabilities(),
-        facility_aware=aware, default_p=model.p("unseen"),
-    )
-    if plan.status == "infeasible":
-        print(f"Can't build this week: {plan.reason}", file=sys.stderr)
-        return 2
-
-    title = f"Week of {week:%d %b %Y} — {phase}, {wtype.replace('_', '-')}"
-    version, files, synced = _save(cfg, plan, week, out, "week", title, wtype)
-    print(_markdown(plan, f"{title} (v{version})"))
-    for n in notes:
+    ws = _ws(a)
+    res = ws.plan_week(_week(a, ws, "next"), a.phase, ramp=a.ramp,
+                       prev_minutes=a.prev_minutes, experiment_start=a.experiment_start)
+    title = f"Week of {res.week:%d %b %Y} — {res.phase}, {res.week_type.replace('_', '-')}"
+    print(plan_markdown(res.plan, f"{title} (v{res.version})"))
+    for n in res.notes:
         print(f"• {n}")
-    print(f"\nTargets: {describe_targets(targets)}  |  free time: {available / 60:.1f}h")
-    if prev is not None:
-        print(f"Capped at +{a.ramp:.0%} on last week's {prev / 60:.1f}h done.")
-    print(f"Saved {files['ics'][0]} (import into your calendar), {len(files['fit'])} .FIT "
-          f"workouts for your watch; {synced}.")
+    print(f"\nTargets: {describe_targets(res.targets)}  |  free time: {res.available_min / 60:.1f}h")
+    if res.previous_min is not None:
+        print(f"Capped at +{a.ramp:.0%} on last week's {res.previous_min / 60:.1f}h done.")
+    print(f"Saved {res.files['ics'][0]} (import into your calendar), {len(res.files['fit'])} .FIT "
+          f"workouts for your watch; {res.log_summary}.")
     print("Next: tri-plan today  ·  tri-plan log")
     return 0
 
 
-def _latest(a: argparse.Namespace, week: date) -> Plan | None:
-    plan = PlanStore(Path(a.out) / "plan_session_version.jsonl").load(week)
-    if plan is None:
-        print(f"No plan for the week of {week} yet. Run: tri-plan week --week {week}",
-              file=sys.stderr)
-    return plan
-
-
-def _log_index(out: Path, week: date) -> dict[str, LogRow]:
-    return {r.session_id: r for r in _load_log(out / "log.csv") if r.week == week}
-
-
 def cmd_show(a: argparse.Namespace) -> int:
-    cfg = load_config(a.config or DEFAULT_CONFIG)
-    week = _week(a, cfg, "this")
-    plan = _latest(a, week)
-    if plan is None:
-        return 2
-    print(_markdown(plan, f"Week of {week:%d %b %Y}", _log_index(Path(a.out), week)))
+    ws = _ws(a)
+    week = _week(a, ws, "this")
+    plan = ws.require_plan(week)
+    print(plan_markdown(plan, f"Week of {week:%d %b %Y}", ws.log_index(week)))
     return 0
 
 
 def _today_line(p: Placement, row: LogRow | None) -> str:
-    done = _status_cell(row)
+    done = status_text(row)
     return (
         f"  {p.start:%H:%M}–{p.end:%H:%M}  {p.slot.location:<12} {p.session.label}"
         f"{'   ' + done if done else ''}\n      {how_to(p.session)}"
@@ -221,14 +102,12 @@ def _today_line(p: Placement, row: LogRow | None) -> str:
 
 
 def cmd_today(a: argparse.Namespace) -> int:
-    cfg = load_config(a.config or DEFAULT_CONFIG)
-    day = date.fromisoformat(a.date) if a.date else _now(cfg).date()
+    ws = _ws(a)
+    day = date.fromisoformat(a.date) if a.date else _now(ws.cfg).date()
     week = parse_week(str(day), day)
-    plan = _latest(a, week)
-    if plan is None:
-        return 2
-    log = _log_index(Path(a.out), week)
-    todays = [p for p in plan.placements if p.slot.on == day]
+    plan = ws.require_plan(week)
+    log = ws.log_index(week)
+    todays = placements_on(plan, day)
     print(f"{day:%A %d %B}")
     if not todays:
         print("  Rest day. Nothing planned.")
@@ -250,148 +129,93 @@ def _ask_choice(ask: Ask, prompt: str, options: dict[str, str]) -> str:
         print(f"  ✗ type one of: {', '.join(k for k in options if k)}")
 
 
-def _ask_row(r: LogRow, label: str, ask: Ask) -> LogRow | None:
-    """Ask about one session. None = leave it for later."""
+def _ask_and_log(ws: Workspace, r: LogRow, label: str, ask: Ask) -> bool:
+    """Ask about one session and save it. False = left for later."""
     status = _ask_choice(
         ask, f"{r.on:%a %d %b}  {label}\n  [d]one, [s]kipped, [m]oved, Enter = later: ",
         {"d": "done", "done": "done", "s": "skipped", "skipped": "skipped",
          "m": "moved", "moved": "moved", "": ""},
     )
     if not status:
-        return None
-    update: dict[str, object] = {"status": status}
-    if status in ("done", "moved"):
-        while True:
-            mins = ask(f"  Minutes [{r.planned_min}]: ").strip()
-            if not mins or mins.isdigit():
-                update["actual_min"] = int(mins) if mins else r.planned_min
-                break
-            print("  ✗ a number of minutes, please")
-        update["pain"] = ask("  Anything hurt? [y/N]: ").strip().lower() in ("y", "yes")
-    else:
+        return False
+    if status == "skipped":
         menu = {str(i): reason for i, reason in enumerate(REASONS, 1)}
         prompt = "  Why? " + "  ".join(f"{i}) {x.replace('_', ' ')}" for i, x in menu.items()) + ": "
-        update["reason"] = _ask_choice(ask, prompt, menu)
-    return r.model_copy(update=update)
+        ws.log_session(r.week, r.session_id, "skipped", reason=_ask_choice(ask, prompt, menu))
+        return True
+    while True:
+        mins = ask(f"  Minutes [{r.planned_min}]: ").strip()
+        if not mins or mins.isdigit():
+            break
+        print("  ✗ a number of minutes, please")
+    pain = ask("  Anything hurt? [y/N]: ").strip().lower() in ("y", "yes")
+    ws.log_session(r.week, r.session_id, status,  # type: ignore[arg-type]
+                   minutes=int(mins) if mins else None, pain=pain)
+    return True
 
 
 def cmd_log(a: argparse.Namespace, ask: Ask | None = None) -> int:
     ask = ask or input
-    cfg = load_config(a.config or DEFAULT_CONFIG)
-    out = Path(a.out)
-    log_path = out / "log.csv"
-    log = _load_log(log_path)
-    today = _now(cfg).date()
-    week = _week(a, cfg, "this")
-    plan = PlanStore(out / "plan_session_version.jsonl").load(week)
-    labels = {p.session.id: p.session.label for p in plan.placements} if plan else {}
-
+    ws = _ws(a)
+    week = _week(a, ws, "this")
     if a.session:  # one-shot: tri-plan log --session bike-long --status done --min 100
-        idx = next((i for i, r in enumerate(log) if r.week == week and r.session_id == a.session), None)
-        if idx is None:
-            ids = ", ".join(r.session_id for r in log if r.week == week) or "none"
-            print(f"No session '{a.session}' in the week of {week}. Sessions: {ids}", file=sys.stderr)
-            return 2
         if a.status is None:
-            print("Say what happened: done, skipped or moved", file=sys.stderr)
-            return 2
-        r = log[idx]
-        update: dict[str, object] = {"status": a.status, "pain": a.pain}
-        if a.status == "skipped":
-            update["reason"] = a.reason or "other"
-        else:
-            update["actual_min"] = a.minutes if a.minutes is not None else r.planned_min
-        log[idx] = LogRow.model_validate({**r.model_dump(), **update})
-        write_log(log_path, log)
-        print(f"Logged {a.session}: {_status_cell(log[idx])}")
+            raise PlannerError("Say what happened: --status done, skipped or moved")
+        row = ws.log_session(week, a.session, a.status, minutes=a.minutes, reason=a.reason,
+                             pain=a.pain)
+        print(f"Logged {a.session}: {status_text(row)}")
         return 0
 
-    todo = [i for i, r in enumerate(log) if r.week == week and not r.logged and r.on <= today]
+    today = _now(ws.cfg).date()
+    plan = ws.plan(week)
+    labels = {p.session.id: p.session.label for p in plan.placements} if plan else {}
+    todo = [r for r in ws.log() if r.week == week and not r.logged and r.on <= today]
     if not todo:
         print("Nothing to log: everything up to today is ticked off.")
         return 0
     print(f"{len(todo)} session(s) to log. Enter skips one for now.\n")
-    changed = 0
-    for i in todo:
-        new = _ask_row(log[i], labels.get(log[i].session_id, log[i].session_id), ask)
-        if new is not None:
-            log[i] = LogRow.model_validate(new.model_dump())
-            write_log(log_path, log)  # save as we go, so Ctrl-C loses nothing answered
-            changed += 1
-    print(f"\nSaved {changed} session(s) to {log_path}.")
-    summary = next((s for s in weekly_summaries(log) if s.week == week), None)
+    changed = sum(_ask_and_log(ws, r, labels.get(r.session_id, r.session_id), ask) for r in todo)
+    print(f"\nSaved {changed} session(s) to {ws.log_path}.")
+    summary = ws.summary(week)
     if summary:
         print(summary.line())
-    if any(r.pain for r in log if r.week == week):
+    if any(r.pain for r in ws.log() if r.week == week):
         print("Something hurt: if it's the same thing twice, the planner pauses that sport.")
     return 0
 
 
-def _when(uid: str | None) -> str:
-    """'2026-11-12|thu-16:15-18:15@School' -> 'Thu 16:15 School'."""
-    if not uid:
-        return "—"
-    key = uid.split("|")[-1]
-    when, _, place = key.partition("@")
-    day, _, rest = when.partition("-")
-    return f"{day.title()} {rest.split('-')[0]} {place}"
-
-
 def cmd_replan(a: argparse.Namespace) -> int:
-    cfg = load_config(a.config or DEFAULT_CONFIG)
-    now = datetime.fromisoformat(a.now) if a.now else _now(cfg)
-    week = _week(a, cfg, str(now.date()))
-    out = Path(a.out)
-    previous = PlanStore(out / "plan_session_version.jsonl").load(week)
-    if previous is None:
-        print(f"No plan stored for week {week}; run `tri-plan week` first.", file=sys.stderr)
-        return 2
-    ids = {p.session.id for p in previous.placements}
-    unknown = [f for f in a.flag if f not in ids]
-    if unknown:
-        print(f"Unknown session {unknown}. This week's: {', '.join(sorted(ids))}", file=sys.stderr)
-        return 2
-    gone = resolve_slots(a.unavailable, calendar_for_week(cfg, week))
-    istore = InjuryStore(out / "injuries.json")
-    injuries = istore.declare(
-        [parse_injury(i, now.date()) for i in a.injury], a.clear_injury, now.date()
-    )
-    log = _load_log(out / "log.csv")
-    done = {r.session_id for r in log if r.week == week and r.status in ("done", "moved")}
-    skipped = {r.session_id for r in log if r.week == week and r.status == "skipped"}
-    model = AdherenceModel(a.prior_alpha, a.prior_beta).update(log)
-    res = replan(
-        cfg, previous, now, p_complete=model.probabilities(), done_ids=done, skipped_ids=skipped,
-        flagged=a.flag, unavailable_slots=gone, injuries=injuries, log=istore.pain_rows(log),
+    ws = _ws(a)
+    now = datetime.fromisoformat(a.now) if a.now else _now(ws.cfg)
+    week = _week(a, ws, str(now.date()))
+    res = ws.replan(
+        now, week, unavailable=a.unavailable, flags=a.flag, clear_injuries=a.clear_injury,
+        injuries=[parse_injury(i, now.date()) for i in a.injury],
     )
     for n in res.notes:
         print(f"• {n}")
-    if res.plan.status == "infeasible":
-        return 2
-    wtype = next((r.week_type for r in log if r.week == week), "facility_aware")
-    title = f"Week of {week:%d %b %Y} — re-plan"
-    # The re-plan only covers what's left; keep the earlier sessions so the stored
-    # week (and the log) still show what was planned before now.
-    new_ids = {p.session.id for p in res.plan.placements}
-    history = [p for p in previous.placements if p.starts_at < now and p.session.id not in new_ids]
-    full = res.plan.model_copy(
-        update={"placements": sorted(history + res.plan.placements, key=lambda p: p.starts_at)}
-    )
-    version, _files, synced = _save(cfg, full, week, out, "replan", title, wtype)
     print("\nChanges:" if res.moves else "\nNo changes needed.")
     for m in res.moves:
-        print(f"  {m.session_id}: {_when(m.from_slot)} → {_when(m.to_slot) if m.to_slot else 'dropped'}"
-              f"  ({m.reason.replace('_', ' ')})")
-    print(f"\n{_markdown(full, f'{title} (v{version})', _log_index(out, week))}\n\n{synced}")
+        to = slot_label(m.to_slot) if m.to_slot else "dropped"
+        print(f"  {m.session_id}: {slot_label(m.from_slot)} → {to}  ({m.reason.replace('_', ' ')})")
+    title = f"Week of {week:%d %b %Y} — re-plan (v{res.version})"
+    print(f"\n{plan_markdown(res.plan, title, ws.log_index(week))}\n\n{res.log_summary}")
     return 0
 
 
 def cmd_report(a: argparse.Namespace) -> int:
     path = Path(a.log or Path(a.out) / "log.csv")
     if not path.exists():
-        print(f"No log at {path} yet. Plan a week first: tri-plan week", file=sys.stderr)
-        return 2
+        raise PlannerError(f"No log at {path} yet. Plan a week first: tri-plan week")
     print(weekly_report(read_log(path)))
+    return 0
+
+
+def cmd_web(a: argparse.Namespace) -> int:
+    from planner.web import serve
+
+    serve(Path(a.config or DEFAULT_CONFIG), Path(a.out), host=a.host, port=a.port,
+          open_browser=not a.no_browser)
     return 0
 
 
@@ -399,7 +223,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="tri-plan",
         description="Triathlon training that fits the week you actually have.",
-        epilog="Start with: tri-plan init",
+        epilog="Start with: tri-plan web   (or tri-plan init for the terminal version)",
     )
     sub = ap.add_subparsers(dest="cmd", required=True, metavar="command")
 
@@ -409,6 +233,15 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--out", default="out", help="where plans and the log live (default: out)")
         p.add_argument("--prior-alpha", type=float, default=2.0, help=argparse.SUPPRESS)
         p.add_argument("--prior-beta", type=float, default=2.0, help=argparse.SUPPRESS)
+
+    wb = sub.add_parser("web", help="open the planner in your browser")
+    wb.add_argument("config", nargs="?", help=f"your config file (default: {DEFAULT_CONFIG})")
+    wb.add_argument("--out", default="out", help="where plans and the log live (default: out)")
+    wb.add_argument("--port", type=int, default=8000)
+    wb.add_argument("--host", default="127.0.0.1",
+                    help="0.0.0.0 to use it from your phone on the same wifi")
+    wb.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
+    wb.set_defaults(fn=cmd_web)
 
     i = sub.add_parser("init", help="set up your config by answering questions")
     i.add_argument("config", nargs="?", help=f"file to create (default: {DEFAULT_CONFIG})")
@@ -470,6 +303,9 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as err:
         print(f"Config error: {err}", file=sys.stderr)
         return 1
+    except PlannerError as err:
+        print(f"✗ {err}", file=sys.stderr)
+        return 2
     except ValueError as err:
         print(f"✗ {err}", file=sys.stderr)
         return 1

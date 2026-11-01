@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}tri-planner{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏊</text></svg>">
+</head>
+<body>
+<header class="top">
+  <div class="inner">
+    <a class="brand" href="{{ url_for('today') }}">tri-planner</a>
+    <nav class="tabs">
+      <a href="{{ url_for('today') }}" class="{{ 'on' if nav == 'today' }}"><span class="ico">☀️</span>Today</a>
+      <a href="{{ url_for('week_view') }}" class="{{ 'on' if nav == 'week_view' }}"><span class="ico">📅</span>Week</a>
+      <a href="{{ url_for('replan_form') }}" class="{{ 'on' if nav in ('replan_form', 'replan_run') }}"><span class="ico">🔀</span>Changed</a>
+      <a href="{{ url_for('progress') }}" class="{{ 'on' if nav == 'progress' }}"><span class="ico">📈</span>Progress</a>
+      <a href="{{ url_for('setup') }}" class="{{ 'on' if nav == 'setup' }}"><span class="ico">⚙️</span>Setup</a>
+    </nav>
+  </div>
+</header>
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}<div class="flash {{ cat }}" role="status">{{ msg }}</div>{% endfor %}
+  {% endwith %}
+  {% block body %}{% endblock %}
+</main>
+{% block scripts %}{% endblock %}
+</body>
+</html>

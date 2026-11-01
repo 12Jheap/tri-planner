@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Setup · tri-planner{% endblock %}
+{% macro location_block(i, loc) %}
+<div class="panel loc" data-i="{{ i }}">
+  <div class="grid2" style="grid-template-columns: 1fr auto; align-items:end">
+    <label>Place
+      <input type="text" name="loc-{{ i }}-name" value="{{ loc.name if loc else '' }}" placeholder="e.g. Home, School, Gym" class="loc-name">
+    </label>
+    <button type="button" class="ghost danger" onclick="removeLoc(this)">Remove</button>
+  </div>
+  <p class="small muted" style="margin-top:10px">What can you use there?</p>
+  <div class="kit">
+    {% for fac, text in facilities.items() %}
+      <label class="check"><input type="checkbox" name="loc-{{ i }}-kit" value="{{ fac.value }}"
+        {{ 'checked' if loc and fac.value in loc.kit }} onchange="toggleHours(this)"> {{ text }}</label>
+      {% if fac in windowed %}
+        <label class="hours" {{ '' if loc and fac.value in loc.kit else 'hidden' }}>
+          <span class="hint">{{ text|capitalize }} opening hours (blank = whenever you're there)</span>
+          <input type="text" name="loc-{{ i }}-hours-{{ fac.value }}" value="{{ loc.hours.get(fac.value, '') if loc else '' }}"
+            placeholder="mon-fri 16:00-19:00; weekends 8-12">
+        </label>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+{% macro slot_row(day, s) %}
+<div class="slot-row">
+  <input type="time" name="slot-{{ day }}-start" value="{{ s.start.strftime('%H:%M') if s else '' }}" aria-label="From">
+  <input type="time" name="slot-{{ day }}-end" value="{{ s.end.strftime('%H:%M') if s else '' }}" aria-label="To">
+  <select name="slot-{{ day }}-loc" class="loc-select" data-value="{{ s.location if s else '' }}" aria-label="Where"></select>
+  <button type="button" class="ghost" onclick="this.parentElement.remove()" aria-label="Remove slot">✕</button>
+</div>
+{% endmacro %}
+{% block body %}
+<h1>{{ 'Set up your week' if first else 'Setup' }}</h1>
+<p class="muted">{{ 'Answer these once. You can change them any time.' if first else 'Change anything, then Save. The next plan uses it.' }}</p>
+
+<form method="post" action="{{ url_for('setup_save') }}" id="setup">
+  <input type="hidden" name="token" value="{{ token }}">
+  <input type="hidden" name="mode" value="form">
+
+  <div class="panel">
+    <h2 style="margin-top:0">You and your race</h2>
+    <div class="grid2">
+      <label>Name <input type="text" name="athlete" value="{{ form.athlete }}" autocomplete="given-name"></label>
+      <label>Race
+        <select name="race">
+          <option value="sprint" {{ 'selected' if form.race == 'sprint' }}>Sprint (750m / 20km / 5km)</option>
+          <option value="olympic" {{ 'selected' if form.race == 'olympic' }}>Olympic (1.5km / 40km / 10km)</option>
+        </select>
+      </label>
+      <label>Race date <input type="date" name="race_date" value="{{ form.race_date }}">
+        <span class="hint">Sets base / build / taper automatically.</span></label>
+      <label>Hours a week, normal week
+        <input type="number" name="weekly_hours" step="0.5" min="1" max="30" value="{{ form.weekly_hours }}" placeholder="{{ default_hours[form.race]|round(1) }}">
+        <span class="hint">Build weeks add ~10%, taper cuts ~40%.</span></label>
+    </div>
+  </div>
+
+  <h2>Where you train</h2>
+  <div id="locs">
+    {% for loc in form.locations %}{{ location_block(loop.index0, loc) }}{% endfor %}
+    {% if not form.locations %}{{ location_block(0, {'name': 'Home', 'kit': [], 'hours': {}}) }}{% endif %}
+  </div>
+  <button type="button" onclick="addLoc()">+ Add a place</button>
+
+  <h2>When you're free</h2>
+  <p class="small muted">A normal week. Only times you could genuinely train, and where you'll be.</p>
+  <div class="panel">
+    {% for d in days %}
+      <div class="daypick" data-day="{{ d }}">
+        <h3>{{ {'mon':'Monday','tue':'Tuesday','wed':'Wednesday','thu':'Thursday','fri':'Friday','sat':'Saturday','sun':'Sunday'}[d] }}</h3>
+        <div class="rows">{% for s in form.slots.get(d, []) %}{{ slot_row(d, s) }}{% endfor %}</div>
+        <button type="button" class="ghost" onclick="addSlot('{{ d }}', this)">+ Add time</button>
+      </div>
+    {% endfor %}
+  </div>
+
+  <h2>Holidays, exams and away weeks</h2>
+  <p class="small muted">Between these dates, use a different week instead of your normal one.
+    {% if not form.templates %}To add other weeks (e.g. "holiday"), use the advanced editor below.{% endif %}</p>
+  <div class="panel" id="ovs">
+    {% for o in form.overrides %}
+      <div class="ov-row">
+        <input type="text" name="ov-name" value="{{ o.name }}" aria-label="Name">
+        <input type="date" name="ov-start" value="{{ o.start }}" aria-label="From">
+        <input type="date" name="ov-end" value="{{ o.end }}" aria-label="To">
+        <select name="ov-template" aria-label="Week to use">
+          {% for t in form.templates %}<option {{ 'selected' if t == o.template }}>{{ t }}</option>{% endfor %}
+        </select>
+        <button type="button" class="ghost" onclick="this.parentElement.remove()" aria-label="Remove">✕</button>
+      </div>
+    {% endfor %}
+    {% if form.templates %}<button type="button" class="ghost" onclick="addOverride()">+ Add dates</button>{% endif %}
+  </div>
+
+  <div class="sticky-save"><button class="primary" style="width:100%">Save</button></div>
+</form>
+
+<details {{ 'open' if show_raw }} style="margin-top:24px">
+  <summary class="btn">Advanced: edit the settings file</summary>
+  <form method="post" action="{{ url_for('setup_save') }}" style="margin-top:12px">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="mode" value="raw">
+    <p class="small muted">The full YAML file. Checked before it's saved. Saving the form above rewrites this file (comments are lost).</p>
+    <textarea name="raw" spellcheck="false">{{ raw_text }}</textarea>
+    <div class="actions"><button class="primary">Save file</button></div>
+  </form>
+</details>
+
+<template id="slot-tpl">{{ slot_row('__DAY__', None) }}</template>
+<template id="loc-tpl">{{ location_block('__I__', None) }}</template>
+<template id="ov-tpl">
+  <div class="ov-row">
+    <input type="text" name="ov-name" placeholder="e.g. Christmas" aria-label="Name">
+    <input type="date" name="ov-start" aria-label="From">
+    <input type="date" name="ov-end" aria-label="To">
+    <select name="ov-template" aria-label="Week to use">{% for t in form.templates %}<option>{{ t }}</option>{% endfor %}</select>
+    <button type="button" class="ghost" onclick="this.parentElement.remove()" aria-label="Remove">✕</button>
+  </div>
+</template>
+{% endblock %}
+{% block scripts %}
+<script>
+function locNames() {
+  return [...document.querySelectorAll('.loc-name')].map(i => i.value.trim()).filter(Boolean);
+}
+function refreshLocs() {
+  const names = locNames();
+  document.querySelectorAll('.loc-select').forEach(sel => {
+    const want = sel.value || sel.dataset.value || names[0] || '';
+    sel.innerHTML = names.map(n => `<option>${n.replace(/</g, '&lt;')}</option>`).join('');
+    if (names.includes(want)) sel.value = want;
+    sel.dataset.value = sel.value;
+  });
+}
+function addSlot(day, btn) {
+  const html = document.getElementById('slot-tpl').innerHTML.replaceAll('__DAY__', day);
+  btn.previousElementSibling.insertAdjacentHTML('beforeend', html);
+  refreshLocs();
+}
+function addLoc() {
+  const i = Math.max(-1, ...[...document.querySelectorAll('.loc')].map(l => +l.dataset.i)) + 1;
+  document.getElementById('locs').insertAdjacentHTML('beforeend',
+    document.getElementById('loc-tpl').innerHTML.replaceAll('__I__', i));
+  document.querySelector(`.loc[data-i="${i}"] .loc-name`).focus();
+}
+function removeLoc(btn) {
+  if (document.querySelectorAll('.loc').length > 1) { btn.closest('.loc').remove(); refreshLocs(); }
+}
+function addOverride() {
+  const btn = document.querySelector('#ovs > button');
+  btn.insertAdjacentHTML('beforebegin', document.getElementById('ov-tpl').innerHTML);
+}
+function toggleHours(box) {
+  const hours = box.parentElement.nextElementSibling;
+  if (hours && hours.classList.contains('hours')) hours.hidden = !box.checked;
+}
+document.addEventListener('input', e => { if (e.target.classList.contains('loc-name')) refreshLocs(); });
+refreshLocs();
+</script>
+{% endblock %}

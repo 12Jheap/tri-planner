@@ -487,6 +487,50 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 - **Evidence:** `tests/test_us_014_everyday_usability.py::test_ac_064_today_shows_sessions_with_instructions_and_phase_from_race_date` (pytest, 1 Nov 2026)
 - **Verified-by:** pytest
 
+### US-015: Local web app (v0)
+
+#### AC-065: `tri-plan web` serves Today, Week, Changed, Progress and Setup; with no config the first page is Setup
+- **Method:** e2e-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_065_serves_every_page_and_sends_first_run_to_setup
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_065_serves_every_page_and_sends_first_run_to_setup` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-066: The setup form creates and edits the config without YAML; bad input is rejected with a reason and the file is left alone; an existing config round-trips unchanged
+- **Method:** e2e-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_066_setup_form_writes_a_valid_config_and_rejects_bad_input
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_066_setup_form_writes_a_valid_config_and_rejects_bad_input` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-067: Planning a week from the website writes the same plan, .ics, .FIT and log as the CLI, and offers the .ics and a .zip of workouts to download
+- **Method:** e2e-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_067_planning_from_the_website_writes_the_same_files_and_offers_downloads
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_067_planning_from_the_website_writes_the_same_files_and_offers_downloads` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-068: From Today or Week: Done (minutes, something hurt, another time), Skipped with one reason tap, and Undo
+- **Method:** e2e-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_068_log_done_skipped_and_undo_from_the_website
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_068_log_done_skipped_and_undo_from_the_website` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-069: "Something's changed" re-plans from ticked slots, a new or cleared injury and flagged sessions, and shows a receipt for every move
+- **Method:** e2e-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_069_something_changed_replans_and_shows_a_receipt_per_move
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_069_something_changed_replans_and_shows_a_receipt_per_move` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-070: Every form needs the page's secret token, so another website open in your browser can't change your plan or log
+- **Method:** unit-test
+- **Test:** `tests/test_us_015_local_web_app.py` > test_ac_070_forms_only_accept_posts_from_the_app_itself
+- **Status:** verified
+- **Evidence:** `tests/test_us_015_local_web_app.py::test_ac_070_forms_only_accept_posts_from_the_app_itself` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
 ## Verification Summary
 | ID | Criterion | Method | Status | Evidence |
 |----|-----------|--------|--------|----------|
@@ -554,7 +598,13 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 | AC-062 | `log` records done/skipped/moved with minutes, reason and pa… | e2e-test | verified | test_us_014_everyday_usability.py |
 | AC-063 | Declared injuries persist across commands, apply when planni… | unit-test | verified | test_us_014_everyday_usability.py |
 | AC-064 | `today` shows today's sessions with plain-English instructio… | e2e-test | verified | test_us_014_everyday_usability.py |
+| AC-065 | `tri-plan web` serves Today, Week, Changed, Progress and Set… | e2e-test | verified | test_us_015_local_web_app.py |
+| AC-066 | The setup form creates and edits the config without YAML; ba… | e2e-test | verified | test_us_015_local_web_app.py |
+| AC-067 | Planning a week from the website writes the same plan, .ics,… | e2e-test | verified | test_us_015_local_web_app.py |
+| AC-068 | From Today or Week: Done (minutes, something hurt, another t… | e2e-test | verified | test_us_015_local_web_app.py |
+| AC-069 | "Something's changed" re-plans from ticked slots, a new or c… | e2e-test | verified | test_us_015_local_web_app.py |
+| AC-070 | Every form needs the page's secret token, so another website… | unit-test | verified | test_us_015_local_web_app.py |
 
-Progress: 37/64 verified — v0 (AC-001–AC-027, AC-055–AC-064) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+Progress: 43/70 verified — v0 (AC-001–AC-027, AC-055–AC-070) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
 
 GitHub issue: not created — no repository linked to this session.

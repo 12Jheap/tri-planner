@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "_session.html" import session with context %}
+{% block title %}Today · tri-planner{% endblock %}
+{% block body %}
+<div class="pager">
+  <a href="{{ url_for('today', d=prev) }}" aria-label="Previous day">←</a>
+  <div style="text-align:center">
+    <h1>{{ 'Today' if is_today else day.strftime('%A') }}</h1>
+    <p class="muted small">{{ day.strftime('%A %d %B') }}</p>
+  </div>
+  <a href="{{ url_for('today', d=next) }}" aria-label="Next day">→</a>
+</div>
+
+{% for b in banners %}<div class="flash info">{{ b }}</div>{% endfor %}
+
+{% if summary %}
+<div class="progress">
+  <div class="bar" role="img" aria-label="{{ (summary.ratio * 100)|round|int }}% of this week done">
+    <span style="width: {{ [summary.ratio * 100, 100]|min }}%"></span>
+  </div>
+  <p class="small muted">{{ fmt_min(summary.completed_min) }} of {{ fmt_min(summary.planned_min) }} done this week · {{ summary.logged }}/{{ summary.sessions }} sessions logged</p>
+</div>
+{% endif %}
+
+{% if not plan %}
+  <div class="panel empty">
+    <div class="big">📅</div>
+    <h2>No plan for this week yet</h2>
+    <p class="muted">It takes a couple of seconds.</p>
+    <form method="post" action="{{ url_for('plan_week') }}">
+      <input type="hidden" name="token" value="{{ token }}">
+      <input type="hidden" name="week" value="{{ week }}">
+      <button class="primary">Plan this week</button>
+    </form>
+  </div>
+{% else %}
+  {% for c in cards %}
+    {{ session(c, url_for('today', d=day)) }}
+  {% else %}
+    <div class="panel empty">
+      <div class="big">😴</div>
+      <h2>Rest day</h2>
+      <p class="muted">Nothing planned. Sleep, eat well, stretch if you like.</p>
+    </div>
+  {% endfor %}
+
+  {% if catch_up %}
+    <h2>Not logged yet</h2>
+    <p class="small muted">Tick these off so the planner learns which slots work for you.</p>
+    {% for c in catch_up %}
+      <p class="small muted" style="margin:14px 0 -6px">{{ c.p.slot.on.strftime('%A') }}</p>
+      {{ session(c, url_for('today', d=day), compact=True) }}
+    {% endfor %}
+  {% endif %}
+
+  {% if upcoming %}
+    <h2>Coming up</h2>
+    {% for p in upcoming %}
+      <p>{{ icon[p.session.discipline] }} <strong>{{ p.slot.on.strftime('%a') }} {{ p.start.strftime('%H:%M') }}</strong>
+        {{ nice(p.session) }} <span class="muted">· {{ p.slot.location }}</span></p>
+    {% endfor %}
+    <p><a href="{{ url_for('week_view', w=week) }}">See the whole week →</a></p>
+  {% endif %}
+{% endif %}
+{% endblock %}

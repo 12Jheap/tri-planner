@@ -7,7 +7,8 @@ dependencies = ["ortools>=9.10", "pydantic>=2", "pyyaml", "pandas", "scipy", "ic
 
 [project.optional-dependencies]
 fit = ["fit-tool"]
-dev = ["pytest", "ruff", "mypy", "types-PyYAML", "pandas-stubs"]
+web = ["flask>=3"]
+dev = ["pytest", "ruff", "mypy", "types-PyYAML", "pandas-stubs", "flask>=3"]
 
 [project.scripts]
 tri-plan = "planner.cli:main"
@@ -18,6 +19,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+planner = ["templates/*.html", "static/*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "tests"]

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Something's changed · tri-planner{% endblock %}
+{% block body %}
+<h1>Something's changed?</h1>
+<p class="muted">Tell it what's different and it re-plans the rest of this week. Only what has to move moves.</p>
+
+{% if not plan %}
+  <div class="panel empty">
+    <h2>No plan for this week yet</h2>
+    <p><a class="btn primary" href="{{ url_for('week_view') }}">Go to this week</a></p>
+  </div>
+{% else %}
+<form method="post" action="{{ url_for('replan_run') }}">
+  <input type="hidden" name="token" value="{{ token }}">
+
+  <div class="panel">
+    <h2 style="margin-top:0">Slots you can't make</h2>
+    {% for day, items in by_day.items() %}
+      <div class="daypick">
+        <h3>{{ day.strftime('%A %d %b') }}</h3>
+        {% for it in items %}
+          <label class="check">
+            <input type="checkbox" name="gone" value="{{ it.uid }}">
+            {{ it.slot.start.strftime('%H:%M') }}–{{ it.slot.end.strftime('%H:%M') }} · {{ it.slot.location }}
+            {% if it.planned %}<span class="muted small">({{ it.planned|join(', ') }})</span>{% endif %}
+          </label>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No slots left this week.</p>
+    {% endfor %}
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0">Injury or niggle</h2>
+    <p class="small muted">You decide; it never diagnoses. That sport's load moves to the others until you're back.</p>
+    {% for i in injuries %}
+      <label class="check"><input type="checkbox" name="clear" value="{{ i.discipline }}">
+        I'm back: stop pausing <strong>{{ i.discipline }}</strong> (paused until {{ i.until.strftime('%a %d %b') }})</label>
+    {% endfor %}
+    <div class="grid2" style="margin-top:10px">
+      <label>Pause a sport
+        <select name="injury_sport">
+          <option value="">No new injury</option>
+          <option value="run">🏃 Run</option>
+          <option value="bike">🚴 Bike</option>
+          <option value="swim">🏊 Swim</option>
+        </select>
+      </label>
+      <label>For how many days
+        <input type="number" name="injury_days" min="1" max="60" value="7" inputmode="numeric">
+      </label>
+    </div>
+    <p class="small muted">After two sessions in a row that hurt, a sport pauses by itself and you'll be told to see a physio. Tick "I'm back" above once you've been cleared.</p>
+  </div>
+
+  {% if soon %}
+  <div class="panel">
+    <h2 style="margin-top:0">Next 24 hours</h2>
+    <p class="small muted">These stay put unless you tick them, so a re-plan never surprises you at the last minute.</p>
+    {% for p in soon %}
+      <label class="check"><input type="checkbox" name="flag" value="{{ p.session.id }}">
+        Move {{ icon[p.session.discipline] }} {{ nice(p.session) }} <span class="muted small">({{ p.slot.on.strftime('%a') }} {{ p.start.strftime('%H:%M') }})</span></label>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="sticky-save"><button class="primary" style="width:100%">Re-plan the rest of the week</button></div>
+</form>
+{% endif %}
+{% endblock %}

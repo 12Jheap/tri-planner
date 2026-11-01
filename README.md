@@ -10,10 +10,36 @@ which slots you really train in, re-plans when life happens, and measures one th
 Python 3.11+.
 
 ```bash
-pip install -e ".[fit]"
+pip install -e ".[fit,web]"
 ```
 
-## Quick start (5 minutes)
+## Quick start: the website (easiest)
+
+```bash
+tri-plan web
+```
+
+Your browser opens at http://localhost:8000. The first time, it asks you to set up:
+your race, the hours you want to train, where you train and what's there (and when the
+pool's open), and when you're free each day. Then:
+
+- **Today**: your sessions with how to do each one, and one-tap **Done it** / **Skipped**.
+  Sessions from earlier in the week that you haven't logged show up underneath.
+- **Week**: the whole week. Plan it, download the calendar file and Garmin workouts.
+- **Changed**: tick the slots you can't make, pause a sport for an injury, or say you're
+  back. It re-plans the rest of the week and shows what moved and why.
+- **Progress**: completion per week and per sport, and which slots you actually train in.
+- **Setup**: change anything, including holiday/exam dates. There's an advanced editor for
+  the raw file too.
+
+**On your phone:** run `tri-plan web --host 0.0.0.0`, find your computer's IP address
+(Mac: System Settings → Wi-Fi → Details; Windows: `ipconfig`), and open
+`http://<that IP>:8000` on your phone while it's on the same wifi. Add it to your
+home screen. Only do this on wifi you trust, because anyone on it can open the page.
+
+The website and the commands below use the same files, so you can mix them.
+
+## Quick start: the terminal
 
 ```bash
 tri-plan init        # answer a few questions -> athlete.yaml
@@ -21,12 +47,10 @@ tri-plan week        # plan next week
 tri-plan today       # what's on today, and how to do it
 ```
 
-`init` asks for your race, the hours you want to train, where you train and what's
-there (and when the pool's open), and your free times each day. No YAML needed. You
-can still edit `athlete.yaml` by hand later, e.g. to add holiday templates (see
-`examples/joe.yaml`).
+`init` asks the same questions as the website's setup page. You can still edit
+`athlete.yaml` by hand later, e.g. to add holiday templates (see `examples/joe.yaml`).
 
-## The weekly loop
+## The weekly loop (terminal)
 
 | When | Command | What it does |
 |---|---|---|
@@ -96,14 +120,16 @@ version, never overwritten), `injuries.json`, and one folder per week.
 - `replan.py`: 24h freeze, churn penalty, reason codes, injury remap, debt ledger, pain freeze
 - `store.py`: append-only plan history and remembered injuries
 - `friendly.py` / `wizard.py`: plain-English inputs and the `init` questions
+- `service.py`: every action (plan, log, re-plan) in one place, used by both front ends
+- `web.py` + `templates/` + `static/`: the local website (Flask)
 - `export.py`: `.ics` calendar and `.FIT` structured workouts
 - `report.py`: experiment schedule and completion report
 
 ## Quality gates
 
 ```bash
-pip install -e ".[fit,dev]"
+pip install -e ".[fit,web,dev]"
 pytest && ruff check . && mypy src
 ```
 
-37 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–064).
+43 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–070).
