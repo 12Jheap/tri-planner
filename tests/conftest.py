@@ -54,3 +54,12 @@ def make_session(
 @pytest.fixture
 def monday() -> date:
     return MONDAY
+
+
+@pytest.fixture(autouse=True)
+def _no_real_garmin(tmp_path_factory, monkeypatch):
+    """Tests never see your real Garmin key, so nothing ever syncs your real account."""
+    from planner import garmin
+
+    monkeypatch.setattr(garmin, "KEY_FILE", tmp_path_factory.mktemp("garmin") / "no-key")
+    monkeypatch.delenv(garmin.KEY_ENV, raising=False)

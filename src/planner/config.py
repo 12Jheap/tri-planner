@@ -181,6 +181,7 @@ class AthleteConfig(BaseModel):
     weekly_hours: float | None = None  # older name for profile.current_hours
     timezone: str = "Europe/London"
     profile: Profile = Profile()
+    strength: bool = True  # False = no strength sessions; their time goes to swim/bike/run
     # Alternate facility-aware and time-only weeks from this Monday (the experiment).
     experiment_start: date | None = None
     # Optional: the watch's activity folder when it's plugged in, e.g.

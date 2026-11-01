@@ -150,6 +150,12 @@
     {% if form.templates %}<button type="button" class="quiet" onclick="addOverride()" style="padding-left:0">+ Add dates</button>{% endif %}
   </fieldset>
 
+  <fieldset>
+    <legend>Sessions</legend>
+    <label class="check"><input type="checkbox" name="no_strength" value="1" {{ 'checked' if not strength }}> Don't give me strength sessions</label>
+    <p class="small muted" style="margin:6px 0 0 28px;max-width:60ch">Their time goes to swim, bike and run instead. Strength work does help you hold form late in a race, so it's worth doing somewhere, even if not from this plan.</p>
+  </fieldset>
+
   <h2>Watch and experiment</h2>
   <fieldset>
     <legend>Watch folder</legend>
@@ -179,7 +185,11 @@
       <code>pip install -e ".[garmin]"</code> (needs Python 3.12 or newer), then restart <code>tri-plan web</code>.</p>
   {% endif %}
   {% if garmin_key %}
-    <p><b>Connected.</b> <span class="muted">"Sync from Garmin" on Today ticks off this week's sessions from your recorded activities.</span></p>
+    <p><b>Connected.</b> <span class="muted">Opening Today syncs automatically (at most every 30 minutes): recorded activities tick off sessions, and this morning's sleep, HRV and resting heart rate give a recovery check.</span></p>
+    {% if sync %}
+      <p class="small muted">Last sync {{ sync.at.strftime('%a %d %b %H:%M') }}{% if sync.error %}: <span style="color:var(--bad)">{{ sync.error }}</span>{% else %}. Recovery data found: {{ sync.wellness|join(', ') if sync.wellness else 'none (your watch may not record it)' }}{% if sync.wellness_error %} ({{ sync.wellness_error }}){% endif %}{% endif %}.</p>
+    {% endif %}
+    <p><a class="btn" href="{{ url_for('garmin_hr') }}">Use my Garmin heart rates</a> <span class="small muted">Shows your threshold and max heart rate from Garmin before anything changes.</span></p>
   {% else %}
     <p class="lead">Make a key at <a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Garmin Connect → Personal API</a> and paste it here. It's saved to <code>{{ key_file }}</code>, readable only by you, and never into this project.</p>
   {% endif %}

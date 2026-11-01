@@ -619,6 +619,50 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 - **Evidence:** `tests/test_us_017_less_logging_season_and_control.py::test_ac_082_import_from_the_website_and_still_report_pain` (pytest, 1 Nov 2026)
 - **Verified-by:** pytest
 
+### US-018: Strength opt-out, auto-sync, recovery check, Garmin heart rates, effort check (v0)
+
+#### AC-083: Profile lets you opt out of strength sessions; none are planned and their time goes to swim, bike and run, so the week isn't shorter
+- **Method:** e2e-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_083_you_can_opt_out_of_strength_sessions
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_083_you_can_opt_out_of_strength_sessions` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-084: Opening Today syncs with Garmin in the background at most every 30 minutes (activities and this morning's recovery data); the time of the last sync is shown, and a failed sync never breaks the page
+- **Method:** e2e-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_084_opening_the_app_syncs_with_garmin_at_most_every_30_minutes
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_084_opening_the_app_syncs_with_garmin_at_most_every_30_minutes` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-085: The recovery check reads last night's sleep, HRV and resting heart rate from Garmin and applies three plain rules (2+ flags = low, 1 = watch, 0 = good); missing data is "not available", never an alarm
+- **Method:** unit-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_085_recovery_check_reads_sleep_hrv_and_resting_hr
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_085_recovery_check_reads_sleep_hrv_and_resting_hr` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-086: On a low-recovery day with a quality session planned, Today offers to make it easy (same time, place and sport, easy effort); nothing changes unless you press it, and logged or already-easy sessions can't be eased
+- **Method:** e2e-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_086_on_a_low_day_it_offers_to_make_a_hard_session_easy
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_086_on_a_low_day_it_offers_to_make_a_hard_session_easy` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-087: Your threshold, max and resting heart rate can be read from Garmin; they are shown next to your current values and only saved when you tick and confirm, and your zones follow
+- **Method:** e2e-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_087_heart_rates_from_garmin_are_confirmed_before_use
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_087_heart_rates_from_garmin_are_confirmed_before_use` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-088: When your watch's average heart rate for an easy session was above your easy zone, the session says so; hard sessions and sessions without heart rate aren't flagged
+- **Method:** e2e-test
+- **Test:** `tests/test_us_018_garmin_coaching_and_choices.py` > test_ac_088_effort_check_flags_easy_sessions_done_too_hard
+- **Status:** verified
+- **Evidence:** `tests/test_us_018_garmin_coaching_and_choices.py::test_ac_088_effort_check_flags_easy_sessions_done_too_hard` (pytest, 1 Nov 2026)
+- **Verified-by:** pytest
+
 ## Verification Summary
 | ID | Criterion | Method | Status | Evidence |
 |----|-----------|--------|--------|----------|
@@ -704,7 +748,13 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 | AC-080 | Activity files (.fit, a .zip export, or a folder) tick off t… | integration-test | verified | test_us_017_less_logging_season_and_control.py |
 | AC-081 | "Sync from Garmin" uses Garmin's Personal API client with yo… | integration-test | verified | test_us_017_less_logging_season_and_control.py |
 | AC-082 | On Today you can sync from Garmin or add activity files; imp… | e2e-test | verified | test_us_017_less_logging_season_and_control.py |
+| AC-083 | Profile lets you opt out of strength sessions; none are plan… | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-084 | Opening Today syncs with Garmin in the background at most ev… | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-085 | The recovery check reads last night's sleep, HRV and resting… | unit-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-086 | On a low-recovery day with a quality session planned, Today … | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-087 | Your threshold, max and resting heart rate can be read from … | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
+| AC-088 | When your watch's average heart rate for an easy session was… | e2e-test | verified | test_us_018_garmin_coaching_and_choices.py |
 
-Progress: 55/82 verified — v0 (AC-001–AC-027, AC-055–AC-082) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+Progress: 61/88 verified — v0 (AC-001–AC-027, AC-055–AC-088) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
 
 GitHub issue: not created — no repository linked to this session.

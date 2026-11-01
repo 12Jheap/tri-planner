@@ -13,7 +13,8 @@ project's files. Create a key at https://connect.garmin.com/app/settings/persona
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -73,8 +74,9 @@ def _records(value: Any) -> list[dict[str, Any]]:
     return []
 
 
-def download_recent(start: date, end: date, limit: int = 50) -> list[tuple[str, bytes]]:
-    """(activity id, original-file zip bytes) for activities between two dates."""
+@contextmanager
+def _client() -> Iterator[Any]:
+    """An authenticated Personal API client, with Garmin's errors made readable."""
     if not library_installed():
         raise GarminError(f"Garmin's client isn't installed: {INSTALL_HINT}")
     from garmin_personal_api import (
@@ -87,24 +89,54 @@ def download_recent(start: date, end: date, limit: int = 50) -> list[tuple[str, 
     try:
         with PersonalApiAuthenticator() as auth:
             token = auth.obtain_token(resolve_api_key())
-        out = []
         with GarminPersonalApiClient(token.access_token) as client:
-            listing = client.search_activities(start=0, limit=limit, start_date=start,
-                                               end_date=end)
-            for rec in _records(listing):
-                aid = rec.get("activityId")
-                if aid is None:
-                    continue
-                out.append((str(aid), client.download_activity(aid)))
-        return out
+            yield client
     except GarminPersonalApiError as err:
-        status = getattr(err, "status_code", None)
-        if status == 401:
+        if getattr(err, "status_code", None) == 401:
             raise GarminError("Garmin refused the key. Make a new Personal API key and save "
                               "it again.") from None
         raise GarminError(f"Garmin: {err}") from None
     except OSError as err:
         raise GarminError(f"Couldn't reach Garmin: {err}") from None
+
+
+def download_recent(start: date, end: date, limit: int = 50) -> list[tuple[str, bytes]]:
+    """(activity id, original-file zip bytes) for activities between two dates."""
+    out = []
+    with _client() as client:
+        listing = client.search_activities(start=0, limit=limit, start_date=start,
+                                           end_date=end)
+        for rec in _records(listing):
+            aid = rec.get("activityId")
+            if aid is None:
+                continue
+            out.append((str(aid), client.download_activity(aid)))
+    return out
+
+
+Request = tuple[str, dict[str, str] | None]
+Getter = Callable[[list[Request]], list[Any]]
+
+
+def get_json(requests: list[Request], getter: Getter | None = None) -> list[Any]:
+    """Several GETs in one session. A failing endpoint gives None, not an error, because
+    not every watch records everything (no HRV on older devices, for example)."""
+    if getter is not None:
+        return getter(requests)
+    if not key_available():
+        raise GarminError("No Garmin key yet. Save it on the Profile page.")
+    from garmin_personal_api import HttpError
+
+    out: list[Any] = []
+    with _client() as client:
+        for path, params in requests:
+            try:
+                out.append(client.get(path, params=params))
+            except HttpError as err:
+                if getattr(err, "status_code", None) == 401:
+                    raise
+                out.append(None)
+    return out
 
 
 def fetch_activities(start: date, end: date, tz: str, fetch: Fetcher | None = None

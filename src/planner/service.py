@@ -7,6 +7,7 @@ exactly the same and the tests cover both.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
@@ -37,7 +38,7 @@ from planner.adherence import (
 from planner.config import AthleteConfig, Slot, calendar_for_week, load_config, week_start
 from planner.export import export_week
 from planner.friendly import resolve_slots
-from planner.garmin import Fetcher, fetch_activities
+from planner.garmin import Fetcher, GarminError, Getter, fetch_activities, get_json
 from planner.profile import Profile
 from planner.replan import DebtLedger, Injury, Move, frozen_by_pain, replan, substitute
 from planner.report import week_type
@@ -45,6 +46,13 @@ from planner.sessions import Session, build_week_sessions, how_to
 from planner.solver import Placement, Plan, fill_slots, plan_week, slot_uid
 from planner.store import InjuryStore, PlanStore
 from planner.targets import DEFAULT_HOURS, Phase, is_recovery_week, phase_for, weekly_targets
+from planner.wellness import (
+    Wellness,
+    heart_rates_from_garmin,
+    parse_wellness,
+    wellness_requests,
+    zones_requests,
+)
 from planner.workouts import workout_for
 
 Status = Literal["done", "skipped", "moved"]
@@ -239,7 +247,7 @@ class Workspace:
         hours = cfg.profile.current_hours or DEFAULT_HOURS[cfg.race]
         recovery = phase != "taper" and is_recovery_week(week, cfg.race_date)
         targets = weekly_targets(cfg.race, phase, available, prev, ramp, weekly_hours=hours,
-                                 recovery=recovery)
+                                 recovery=recovery, strength=cfg.strength)
         wtype = week_type(week, experiment_start or cfg.experiment_start)
         aware = wtype == "facility_aware"
         sessions = build_week_sessions(targets, cfg.race, phase, recovery)
@@ -405,12 +413,101 @@ class Workspace:
         result.unreadable = bad
         return result
 
-    def sync_garmin(self, days: int = 14, fetch: Fetcher | None = None) -> ImportResult:
-        end = self.now().date()
+    def sync_garmin(self, days: int = 14, fetch: Fetcher | None = None,
+                    today: date | None = None) -> ImportResult:
+        end = today or self.now().date()
         acts, bad = fetch_activities(end - timedelta(days=days), end, self.cfg.timezone, fetch)
         result = self.import_activities(acts, "garmin_personal")
         result.unreadable = bad
         return result
+
+    # ---- Garmin: one refresh for activities + this morning's readiness ----------------
+    @property
+    def _status_path(self) -> Path:
+        return self.out / "garmin_sync.json"
+
+    def sync_status(self) -> SyncStatus | None:
+        try:
+            return SyncStatus.model_validate_json(self._status_path.read_text("utf-8"))
+        except (OSError, ValueError):
+            return None
+
+    def sync_due(self, now: datetime, every: timedelta = timedelta(minutes=30)) -> bool:
+        last = self.sync_status()
+        return last is None or now - last.at >= every
+
+    def wellness(self, day: date) -> Wellness | None:
+        try:
+            data = json.loads((self.out / "wellness.json").read_text("utf-8"))
+        except (OSError, ValueError):
+            return None
+        raw = data.get(day.isoformat())
+        return Wellness.model_validate(raw) if raw else None
+
+    def _save_wellness(self, w: Wellness) -> None:
+        path = self.out / "wellness.json"
+        try:
+            data = json.loads(path.read_text("utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        data[w.day.isoformat()] = w.model_dump(mode="json")
+        self.out.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=1), encoding="utf-8")
+
+    def refresh_garmin(self, *, fetch: Fetcher | None = None, getter: Getter | None = None,
+                       days: int = 14, now: datetime | None = None) -> SyncStatus:
+        """Pull recent activities and this morning's sleep/HRV/resting HR, and remember
+        when, so opening the app doesn't hit Garmin more than every 30 minutes."""
+        now = now or self.now()
+        status = SyncStatus(at=now)
+        try:
+            res = self.sync_garmin(days=days, fetch=fetch, today=now.date())
+            status.matched = len(res.matched)
+            status.extras = [a.describe() for a in res.extras][:5]
+            status.unreadable = res.unreadable
+        except GarminError as err:
+            status.error = str(err)
+        if status.error is None:
+            try:
+                sleep, hrv, heart = get_json(wellness_requests(now.date()), getter)
+                w = parse_wellness(now.date(), sleep, hrv, heart)
+                w.fetched_at = now
+                self._save_wellness(w)
+                status.wellness = w.found
+            except GarminError as err:  # recovery data is a bonus: never blocks logging
+                status.wellness_error = str(err)
+        self.out.mkdir(parents=True, exist_ok=True)
+        self._status_path.write_text(status.model_dump_json(indent=1), encoding="utf-8")
+        return status
+
+    def garmin_heart_rates(self, getter: Getter | None = None) -> dict[str, int]:
+        """Threshold / max / resting HR as Garmin has them. Shown for you to confirm."""
+        return heart_rates_from_garmin(*get_json(list(zones_requests()), getter))
+
+    def ease_session(self, week: date, session_id: str) -> Plan:
+        """Swap a quality session for an easy one of the same sport, time and place."""
+        plan = self.require_plan(week)
+        p = plan.placement(session_id)
+        if p is None:
+            raise PlannerError(f"No session '{session_id}' in the week of {week:%d %b}.")
+        row = self.log_index(week).get(session_id)
+        if row is not None and row.logged:
+            raise PlannerError("That session is already logged.")
+        s = p.session
+        if s.intensity < 3:
+            raise PlannerError("That session is already easy.")
+        kind = {"run": "easy", "bike": "endurance", "swim": "endurance"}.get(s.discipline)
+        if kind is None:
+            raise PlannerError("Only swim, bike and run sessions can be made easy.")
+        easy = Session(**{**s.model_dump(exclude={"value", "kind", "intensity", "key"}),
+                          "kind": kind, "intensity": 2 if s.discipline != "run" else 1,
+                          "key": False})
+        placements = [q.model_copy(update={"session": easy, "reason": "made_easy"})
+                      if q.session.id == session_id else q for q in plan.placements]
+        new = plan.model_copy(update={"placements": placements})
+        wtype = next((r.week_type for r in self.log() if r.week == week), "facility_aware")
+        self._save(new, week, "ease", f"Week of {week:%d %b %Y} — eased {session_id}", wtype)
+        return new
 
     # ---- moving a session yourself ---------------------------------------------------
     def move_options(self, week: date, session_id: str, now: datetime) -> list[MoveOption]:
@@ -476,7 +573,8 @@ class Workspace:
             available = sum(k.minutes for k in slots)
             prev = max(history[-2:]) if history else None
             projected = sum(weekly_targets(cfg.race, phase, available, prev, 0.10,
-                                           weekly_hours=hours, recovery=recovery).values())
+                                           weekly_hours=hours, recovery=recovery,
+                                           strength=cfg.strength).values())
             summ = summaries.get(wk)
             done = summ.completed_min if summ else None
             reliable = summ is not None and summ.response_rate >= LOW_RESPONSE and wk < \
@@ -496,6 +594,30 @@ class Workspace:
             ))
             wk += timedelta(weeks=1)
         return out
+
+
+class SyncStatus(BaseModel):
+    at: datetime
+    matched: int = 0
+    extras: list[str] = []
+    unreadable: list[str] = []
+    wellness: list[str] = []  # which readiness values Garmin had
+    wellness_error: str | None = None
+    error: str | None = None
+
+
+EASY_KINDS = ("easy", "endurance", "long", "technique", "easy_strides", "substitute")
+
+
+def effort_note(s: Session, row: LogRow | None, profile: Profile) -> str | None:
+    """'Averaged 162 bpm, above your easy zone' when an easy session was run too hard."""
+    if row is None or not row.avg_hr or s.kind not in EASY_KINDS or s.discipline == "swim":
+        return None
+    steady = profile.hr("steady")
+    if steady is None or row.avg_hr <= steady[1]:
+        return None
+    return (f"Averaged {row.avg_hr} bpm, above easy (up to {steady[1]}). Easy days easy, so "
+            "the hard days can be hard.")
 
 
 class MoveOption(BaseModel):

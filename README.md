@@ -68,6 +68,18 @@ overwritten. Your watch can't know if something hurt, so imported sessions have 
 Connect's "Export original" .zip. Or set the watch's activity folder on Profile and import
 over USB, or run `tri-plan import /path/to/GARMIN/Activity`.
 
+**Once connected:**
+- Opening Today syncs in the background (at most every 30 minutes).
+- **Recovery check:** each morning, last night's sleep, HRV and resting heart rate get
+  three plain checks. On a low day with a hard session planned, Today offers **Make it
+  easy**. Nothing changes unless you press it, and it's your signals, not a diagnosis.
+- **Use my Garmin heart rates** (Profile) copies your threshold and max HR from Garmin
+  after you confirm, and your zones follow.
+- **Effort check:** if an easy session's average HR was above your easy zone, the session
+  tells you.
+
+The Personal API is read-only, so workouts still reach the watch as .FIT files.
+
 ## Season, moving sessions and the experiment
 
 - **Season** shows every week to race day: phase, recovery weeks, holidays and exams,
@@ -75,6 +87,7 @@ over USB, or run `tri-plan import /path/to/GARMIN/Activity`.
 - **Move a session yourself:** open it and choose **Move this session**. You only see
   slots where its kit is open and there's room. If the move breaks a coaching rule (two
   hard days in a row, hard on a long day) it's allowed, but you'll be told.
+- **No strength sessions?** Tick it in Profile → Sessions; the time goes to swim, bike and run.
 - **The experiment:** switch it on in **Profile → The experiment**. Weeks alternate
   between normal and time-only test weeks, and Progress compares how much you complete in
   each.
@@ -189,4 +202,4 @@ pip install -e ".[fit,web,garmin,dev]"
 pytest && ruff check . && mypy src
 ```
 
-55 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–082).
+61 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–088).

@@ -33,8 +33,36 @@
       <input type="file" name="files" accept=".fit,.zip" multiple onchange="this.form.submit()">
     </label>
   </form>
-  {% if not garmin_ready %}<a class="small muted" href="{{ url_for('setup') }}#garmin">Connect Garmin</a>{% endif %}
+  {% if not garmin_ready %}<a class="small muted" href="{{ url_for('setup') }}#garmin">Connect Garmin</a>
+  {% elif sync %}<span class="small muted">{% if sync.error %}Last sync failed: {{ sync.error }}{% else %}Synced {{ sync.at.strftime('%H:%M') }}{% endif %}</span>{% endif %}
 </div>
+{% endif %}
+
+{% if ready and ready.level != 'unknown' %}
+<section class="ready ready-{{ ready.level }}" aria-label="Recovery check">
+  <div class="row" style="justify-content:space-between">
+    <b>{{ ready.headline }}</b>
+    <span class="small muted">From Garmin this morning · your signals, not a diagnosis</span>
+  </div>
+  <ul>
+    {% for f in ready.flags %}<li class="flag">{{ f }}</li>{% endfor %}
+    {% for f in ready.fine %}<li>{{ f }}</li>{% endfor %}
+  </ul>
+  {% if ready.level == 'low' and can_ease %}
+    <p class="small" style="margin:8px 0">On a day like this, an easy session usually does more good than a hard one done badly. Your call.</p>
+    <div class="row">
+    {% for c in can_ease %}
+      <form method="post" action="{{ url_for('ease') }}">
+        <input type="hidden" name="token" value="{{ token }}">
+        <input type="hidden" name="week" value="{{ c.week }}">
+        <input type="hidden" name="session" value="{{ c.s.id }}">
+        <input type="hidden" name="next" value="{{ url_for('today') }}">
+        <button>Make {{ c.s.title|lower }} easy</button>
+      </form>
+    {% endfor %}
+    </div>
+  {% endif %}
+</section>
 {% endif %}
 
 {% if summary %}

@@ -75,6 +75,7 @@ def weekly_targets(
     ramp: float = 0.10,
     weekly_hours: float | None = None,
     recovery: bool = False,
+    strength: bool = True,
 ) -> dict[str, int]:
     """Minutes per discipline for the coming week.
 
@@ -104,7 +105,10 @@ def weekly_targets(
     if recovery:
         total *= RECOVERY_VOLUME
 
-    split = SPLITS[race]
+    split = dict(SPLITS[race])
+    if not strength:  # opted out: its share goes to swim, bike and run
+        share = split.pop("strength")
+        split = {d: v / (1 - share) for d, v in split.items()} | {"strength": 0.0}
     targets = {d: _round5(total * split[d]) for d in DISCIPLINES}
     if phase == "taper":
         targets["strength"] = 0

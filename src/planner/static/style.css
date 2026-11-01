@@ -362,3 +362,12 @@ table.data td.feel { color: var(--muted); }
               border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px; }
 .moves .day-row .d { padding-top: 4px; }
 .moves .day-row { padding: 8px 0; }
+
+/* ---------- recovery check & effort ---------- */
+.ready { border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: var(--r);
+         background: var(--surface); padding: 12px 16px; margin: 12px 0 4px; }
+.ready-watch { border-left-color: var(--z-tempo); }
+.ready-low { border-left-color: var(--bad); }
+.ready ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; color: var(--ink-2); }
+.ready li.flag { color: var(--ink); font-weight: 600; }
+.effort-note { font-weight: 500; font-size: 13px; color: var(--bad); margin-top: 4px; }

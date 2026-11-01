@@ -36,13 +36,14 @@ from planner.activities import ImportResult
 from planner.adherence import AdherenceModel, LogRow, weekly_summaries
 from planner.config import DAYS, ConfigError, Facility, parse_config, week_start
 from planner.friendly import parse_injury
-from planner.garmin import Fetcher
+from planner.garmin import Fetcher, Getter
 from planner.profile import ZONE_NAMES, mmss
 from planner.report import completion_by, week_type
-from planner.service import PlannerError, Workspace, placements_on, slot_label
+from planner.service import PlannerError, Workspace, effort_note, placements_on, slot_label
 from planner.sessions import how_to
 from planner.solver import Placement, slot_uid
 from planner.targets import DEFAULT_HOURS, MAX_HOURS, is_recovery_week, phase_for
+from planner.wellness import readiness
 from planner.wizard import FACILITY_NAMES, parse_windows, to_yaml
 from planner.workouts import workout_for
 
@@ -84,11 +85,34 @@ def _dur(seconds: int) -> str:
 
 
 def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
-               garmin_fetch: Fetcher | None = None) -> Flask:
+               garmin_fetch: Fetcher | None = None, garmin_get: Getter | None = None,
+               background: bool = True) -> Flask:
     app = Flask(__name__, template_folder=str(HERE / "templates"),
                 static_folder=str(HERE / "static"))
     app.secret_key = secrets.token_hex(16)
     token = secrets.token_urlsafe(16)  # stops other websites posting to this one
+    sync_lock = threading.Lock()
+
+    def garmin_connected() -> bool:
+        return garmin_fetch is not None or (garmin.library_installed() and garmin.key_available())
+
+    def refresh() -> None:
+        if not sync_lock.acquire(blocking=False):
+            return  # one sync at a time
+        try:
+            ws.refresh_garmin(fetch=garmin_fetch, getter=garmin_get, now=clock())
+        except Exception:
+            app.logger.exception("Garmin sync failed")
+        finally:
+            sync_lock.release()
+
+    def auto_sync() -> None:
+        """Opening the app syncs with Garmin at most every 30 minutes, in the background."""
+        if garmin_connected() and ws.sync_due(clock()):
+            if background:
+                threading.Thread(target=refresh, daemon=True).start()
+            else:
+                refresh()
 
     def clock() -> datetime:
         return now() if now else ws.now()
@@ -108,8 +132,7 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
         return {
             "token": token, "how_to": how_to, "fmt_min": _fmt_min, "nice": _nice,
             "reasons": REASON_TEXT, "nav": request.endpoint, "zone_names": ZONE_NAMES,
-            "mmss": mmss, "dur": _dur, "garmin_ready": garmin_fetch is not None or (
-                garmin.library_installed() and garmin.key_available()),
+            "mmss": mmss, "dur": _dur, "garmin_ready": garmin_connected(),
         }
 
     @app.before_request
@@ -136,6 +159,7 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
         total = max(1, workout.seconds)
         return {
             "p": p, "s": p.session, "row": row if row and row.logged else None,
+            "effort": effort_note(p.session, row, ws.cfg.profile) if row and row.logged else None,
             "loggable": p.slot.on is not None and p.slot.on <= today,
             "week": week_start(p.slot.on) if p.slot.on else None,
             "workout": workout,
@@ -149,6 +173,7 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
     # ---- pages ------------------------------------------------------------------------
     @app.get("/")
     def today() -> str:
+        auto_sync()
         now_ = clock()
         day = date.fromisoformat(request.args["d"]) if request.args.get("d") else now_.date()
         week = week_start(day)
@@ -167,6 +192,10 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
             upcoming=upcoming, summary=ws.summary(week), banners=banners(day),
             is_today=day == now_.date(), prev=day - timedelta(days=1),
             next=day + timedelta(days=1), athlete=ws.cfg.athlete,
+            ready=readiness(ws.wellness(day)) if day == now_.date() else None,
+            wellness=ws.wellness(day), sync=ws.sync_status(),
+            can_ease=[c for c in cards if not c["row"] and c["s"].intensity >= 3
+                      and c["s"].discipline != "strength"],
         )
 
     @app.get("/week")
@@ -275,16 +304,68 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
 
     @app.post("/sync")
     def sync() -> Response:
+        with sync_lock:
+            try:
+                st = ws.refresh_garmin(fetch=garmin_fetch, getter=garmin_get, now=clock())
+            except Exception as err:
+                app.logger.exception("Garmin sync failed")
+                raise PlannerError(f"Sync failed ({type(err).__name__}: {err}). Your plan and "
+                                   "log are unchanged; the details are in the terminal.") from None
+        if st.error:
+            raise PlannerError(st.error)
+        if st.matched:
+            flash(f"Garmin: ticked off {st.matched} session{'s' if st.matched != 1 else ''}. "
+                  "If anything hurt, open the session and say so.", "ok")
+        else:
+            flash("Garmin: nothing new to log.", "info")
+        if st.extras:
+            flash("Recorded but not in the plan: " + "; ".join(st.extras) + ".", "info")
+        if st.unreadable:
+            flash("Couldn't read: " + ", ".join(st.unreadable) + ".", "error")
+        return redirect(request.form.get("next") or url_for("today"))
+
+    @app.post("/ease")
+    def ease() -> Response:
+        f = request.form
+        week = week_start(date.fromisoformat(f["week"]))
+        ws.ease_session(week, f["session"])
+        flash("Made easy: same time and place, easy effort. The hard work can wait a day.",
+              "ok")
+        return redirect(f.get("next") or url_for("today"))
+
+    @app.get("/garmin/heart-rates")
+    def garmin_hr() -> str | Response:
         try:
-            res = ws.sync_garmin(fetch=garmin_fetch)
+            found = ws.garmin_heart_rates(getter=garmin_get)
         except garmin.GarminError as err:
             raise PlannerError(str(err)) from None
-        except Exception as err:
-            app.logger.exception("Garmin sync failed")
-            raise PlannerError(f"Sync failed ({type(err).__name__}: {err}). Your plan and log "
-                               "are unchanged; the details are in the terminal.") from None
-        _import_report(res, "Garmin")
-        return redirect(request.form.get("next") or url_for("today"))
+        if not found:
+            flash("Garmin didn't return heart-rate settings for your account.", "info")
+            return redirect(url_for("setup") + "#garmin")
+        current = ws.cfg.profile
+        return render_template("garmin_hr.html", found=found, current=current)
+
+    @app.post("/garmin/heart-rates")
+    def garmin_hr_apply() -> Response:
+        data = _raw()
+        profile = dict(data.get("profile") or {})
+        applied = []
+        for k in ("threshold_hr", "max_hr"):
+            v = request.form.get(k, "").strip()
+            if v and request.form.get(f"use_{k}"):
+                profile[k] = int(v)
+                applied.append(k.replace("_", " "))
+        if not applied:
+            flash("Nothing changed.", "info")
+            return redirect(url_for("setup") + "#fitness")
+        data["profile"] = profile
+        parse_config(data)
+        ws.config_path.write_text("# Saved by tri-plan web. Edit here or in the app.\n"
+                                  + to_yaml(data), encoding="utf-8")
+        ws.reload()
+        flash(f"Updated {' and '.join(applied)} from Garmin. Your zones are recalculated.",
+              "ok")
+        return redirect(url_for("setup") + "#fitness")
 
     @app.post("/garmin/key")
     def garmin_key() -> Response:
@@ -451,9 +532,10 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
             known=cfg.profile.known if cfg else [],
             experiment=cfg.experiment_start.isoformat() if cfg and cfg.experiment_start else "",
             watch_folder=cfg.watch_folder or "" if cfg else "",
+            strength=cfg.strength if cfg else True,
             next_monday=week_start(clock().date()) + timedelta(days=7),
             garmin_lib=garmin.library_installed(), garmin_key=garmin.key_available(),
-            key_file=garmin.KEY_FILE,
+            key_file=garmin.KEY_FILE, sync=ws.sync_status() if cfg else None,
         )
 
     def _form_to_config(f: Any) -> dict[str, Any]:
@@ -479,6 +561,9 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
         data.pop("experiment_start", None)
         if f.get("experiment") and f.get("experiment_start"):
             data["experiment_start"] = date.fromisoformat(f["experiment_start"])
+        data.pop("strength", None)
+        if f.get("no_strength"):
+            data["strength"] = False
         data.pop("watch_folder", None)
         if f.get("watch_folder", "").strip():
             data["watch_folder"] = f["watch_folder"].strip()

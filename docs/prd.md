@@ -149,6 +149,20 @@ Two stages:
 Note: this uses Garmin's **Personal API** (one athlete's own data, pulled with a personal
 key), which fits v0. US-013's push integration via the Training/Health APIs stays v1.
 
+### US-018: Strength opt-out, auto-sync, recovery check, Garmin heart rates, effort check
+**Description:** As an athlete, I want to drop sessions I'll do elsewhere, have Garmin do the syncing without me pressing anything, get a plain recovery check each morning, reuse the heart rates Garmin already knows, and be told when my easy days weren't easy.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] Profile lets you opt out of strength sessions; none are planned and their time goes to swim, bike and run, so the week isn't shorter
+- [ ] Opening Today syncs with Garmin in the background at most every 30 minutes (activities and this morning's recovery data); the time of the last sync is shown, and a failed sync never breaks the page
+- [ ] The recovery check reads last night's sleep, HRV and resting heart rate from Garmin and applies three plain rules (2+ flags = low, 1 = watch, 0 = good); missing data is "not available", never an alarm
+- [ ] On a low-recovery day with a quality session planned, Today offers to make it easy (same time, place and sport, easy effort); nothing changes unless you press it, and logged or already-easy sessions can't be eased
+- [ ] Your threshold, max and resting heart rate can be read from Garmin; they are shown next to your current values and only saved when you tick and confirm, and your zones follow
+- [ ] When your watch's average heart rate for an easy session was above your easy zone, the session says so; hard sessions and sessions without heart rate aren't flagged
+
+Note: the recovery check offers a change and never makes one. It is the athlete's own
+signals, not a diagnosis (no injury or "injury prevention" claims). Plain rules only.
+
 ### v1 — MVP web app (only if gates pass)
 
 ### US-007: 3-minute onboarding to week-1 preview

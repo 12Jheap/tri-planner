@@ -43,6 +43,7 @@
         {%- if row.source in ('garmin_personal', 'file') %} <span class="muted" style="font-weight:500">· from {{ 'Garmin' if row.source == 'garmin_personal' else 'watch file' }}</span>{% endif %}
         {%- if row.pain %} · pain noted{% endif %}
       {% else %}Skipped · {{ reasons.get(row.reason, row.reason) }}{% endif %}
+      {% if c.effort %}<div class="effort-note">{{ c.effort }}</div>{% endif %}
     </span>
     <input type="hidden" name="token" value="{{ token }}">
     <input type="hidden" name="week" value="{{ c.week }}">
