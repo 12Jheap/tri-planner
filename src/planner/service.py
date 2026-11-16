@@ -8,12 +8,14 @@ exactly the same and the tests cover both.
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime, time, timedelta
+from itertools import pairwise
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
+import yaml
 from pydantic import BaseModel
 
 from planner.activities import (
@@ -41,14 +43,30 @@ from planner.config import (
     Slot,
     calendar_for_week,
     load_config,
+    parse_config,
     week_start,
 )
-from planner.export import export_week
+from planner.export import export_week, ics_bytes
+from planner.fitness import NAMES as FITNESS_NAMES
+from planner.fitness import SPORTS as FITNESS_SPORTS
+from planner.fitness import (
+    FitnessChange,
+    FitnessLog,
+    apply_tests,
+    can_test,
+    describe,
+    next_due,
+    numeric,
+    result_changes,
+    tests_due,
+)
 from planner.friendly import resolve_slots
 from planner.garmin import Fetcher, GarminError, Getter, fetch_activities, get_json
+from planner.load import weekly_loads
 from planner.profile import Profile
 from planner.replan import DebtLedger, Injury, Move, frozen_by_pain, replan, substitute
 from planner.report import week_type
+from planner.review import WeekReview, review_week
 from planner.sessions import Session, build_week_sessions, how_to
 from planner.solver import Placement, Plan, fill_slots, plan_week, slot_uid
 from planner.store import InjuryStore, PlanStore
@@ -60,6 +78,7 @@ from planner.wellness import (
     wellness_requests,
     zones_requests,
 )
+from planner.wizard import to_yaml
 from planner.workouts import workout_for
 
 Status = Literal["done", "skipped", "moved"]
@@ -259,6 +278,7 @@ class Workspace:
             raise PlannerError(f"No free time in the week of {week:%d %b}: add some slots.")
         available = sum(s.minutes for s in slots)
         ahead = False
+        held_rpe: float | None = None
         if prev_minutes is not None:
             prev: int | None = prev_minutes
         else:  # same rule as the Season view, so the two always agree
@@ -266,6 +286,9 @@ class Workspace:
             chain = {c.week: c for c in self.volume_chain(today, week)}
             prev = chain[week].prev if week in chain else self._previous_minutes(log, week)
             ahead = week > week_start(today) + timedelta(days=7)
+            if week in chain:
+                ramp = min(ramp, chain[week].ramp)
+                held_rpe = chain[week].held_after_rpe
         hours = cfg.profile.current_hours or DEFAULT_HOURS[cfg.race]
         recovery = phase != "taper" and is_recovery_week(week, cfg.race_date)
         targets = weekly_targets(cfg.race, phase, available, prev, ramp, weekly_hours=hours,
@@ -278,6 +301,9 @@ class Workspace:
             notes.append("Planned ahead from your season projection, which assumes you "
                          "complete the weeks before. Re-plan it nearer the time to size it "
                          "from what you've actually done.")
+        if held_rpe is not None and not recovery:
+            notes.append(f"Last week felt hard (average effort {held_rpe:g}/10), so this week "
+                         "holds your volume instead of adding 10%.")
         if recovery:
             notes.insert(0, "Recovery week: about 30% less and no hard sessions, so the last "
                             "three weeks' work turns into fitness.")
@@ -289,6 +315,10 @@ class Workspace:
             notes += list(pain.values())
             notes += [f"{d} paused until {i.until:%a %d %b} (declared injury); its load moved to "
                       f"other sports. Clear the injury when you're back." for d, i in injured.items()]
+        if aware and phase != "taper" and not recovery and not race_day:
+            due = [t for t in self.tests_due(week, log) if t not in set(pain) | set(injured)]
+            sessions, test_notes = apply_tests(sessions, due, cfg)
+            notes += test_notes
         model = AdherenceModel(*self.prior).update(log)
         # Half distance needs more sessions than days, so two-session days are normal
         # (still never two of the same sport): the cost of stacking a day is lower.
@@ -384,6 +414,7 @@ class Workspace:
         minutes: int | None = None,
         reason: str | None = None,
         pain: bool = False,
+        rpe: int | None = None,
     ) -> LogRow:
         """Record what happened. status=None clears the entry (back to unlogged)."""
         log = self.log()
@@ -395,19 +426,156 @@ class Workspace:
         r = log[idx]
         if status is None:
             update: dict[str, object] = {"status": "", "reason": "", "actual_min": 0,
-                                         "pain": False}
+                                         "pain": False, "rpe": None}
         elif status == "skipped":
             update = {"status": status, "reason": reason or "other", "actual_min": 0,
-                      "pain": False}
+                      "pain": False, "rpe": None}
         else:
             if minutes is not None and minutes < 0:
                 raise PlannerError("minutes can't be negative")
-            update = {"status": status, "reason": "", "pain": pain,
+            if rpe is not None and not 1 <= rpe <= 10:
+                raise PlannerError("Effort is a number from 1 (very easy) to 10 (flat out).")
+            update = {"status": status, "reason": "", "pain": pain, "rpe": rpe,
                       "actual_min": r.planned_min if minutes is None else minutes}
         log[idx] = LogRow.model_validate({**r.model_dump(), **update})
         write_log(self.log_path, log)
         return log[idx]
 
+
+    # ---- fitness tests -----------------------------------------------------------------
+    def _first_week(self, log: list[LogRow]) -> date | None:
+        return min((r.week for r in log), default=None)
+
+    def tests_due(self, week: date, log: list[LogRow] | None = None) -> list[str]:
+        """Sports to test this week. A test you did last week but haven't entered a
+        result for isn't scheduled again: Today asks for the result instead."""
+        log = self.log() if log is None else log
+        awaiting: set[str] = {str(p.session.discipline) for wk, p in self._done_tests(log)
+                              if wk == week - timedelta(days=7)}
+        return tests_due(self.cfg, week, self._first_week(log), awaiting)
+
+    def _done_tests(self, log: list[LogRow]) -> list[tuple[date, Placement]]:
+        """Test sessions logged as done whose result hasn't been entered yet."""
+        out: list[tuple[date, Placement]] = []
+        tested = self.cfg.profile.tested
+        for r in log:
+            if not r.session_id.endswith("-test") or not r.completed_min:
+                continue
+            if r.discipline in tested and tested[r.discipline] >= r.on:
+                continue
+            plan = self.plan(r.week)
+            p = plan.placement(r.session_id) if plan else None
+            if p is not None:
+                out.append((r.week, p))
+        return out
+
+    def pending_results(self, today: date) -> list[tuple[date, Placement]]:
+        """Tests done in the last two weeks that still need their result entering."""
+        return [(wk, p) for wk, p in self._done_tests(self.log())
+                if wk >= week_start(today) - timedelta(days=7)]
+
+    def raw_config(self) -> dict[str, Any]:
+        try:
+            data = yaml.safe_load(self.config_path.read_text("utf-8"))
+        except (OSError, yaml.YAMLError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def write_config(self, data: dict[str, Any]) -> None:
+        """Validate, then save the settings file (nothing is written if it's invalid)."""
+        parse_config(data)
+        header = "# Saved by tri-plan. Edit here or in the app.\n"
+        self.config_path.write_text(header + to_yaml(data), encoding="utf-8")
+        self.reload()
+
+    def record_test(self, sport: str, values: Mapping[str, str], on: date) -> FitnessChange:
+        """Save a test result: updates the number, the date it was measured, your zones,
+        and this week's (and later) calendar and watch files."""
+        before = describe(self.cfg.profile, sport)
+        try:
+            changes, drop = result_changes(sport, values)
+            raw = self.raw_config()
+            prof = dict(raw.get("profile") or {})
+            for k in drop:
+                prof.pop(k, None)
+            prof.update(changes)
+            prof["tested"] = {**(prof.get("tested") or {}), sport: on}
+            raw["profile"] = prof
+            self.write_config(raw)
+        except (ValueError, ConfigError) as err:
+            raise PlannerError(str(err)) from None
+        profile = self.cfg.profile
+        after = describe(profile, sport) or ""
+        value = numeric(profile, sport) or 0
+        FitnessLog(self.out / "fitness.jsonl").append(on, sport, value, after, values)
+        self.refresh_exports(week_start(on))
+        zone = "threshold"
+        line = f"Threshold is now {profile.target(sport, zone)}."
+        return FitnessChange(sport=sport, on=on, before=before, after=after, zone_line=line)
+
+    def calendar_feed(self, today: date) -> bytes:
+        """One calendar with last week, this week and every planned week after, for a
+        calendar app to subscribe to (it re-reads it, so re-plans show up by themselves)."""
+        start = week_start(today) - timedelta(days=7)
+        placements = [p for wk in self.plans().weeks() if wk >= start
+                      for p in (self.plan(wk) or Plan(status="feasible")).placements]
+        return ics_bytes(placements, self.cfg.timezone, self.cfg.profile)
+
+    def week_review(self, week: date) -> WeekReview | None:
+        plan = self.plan(week)
+        log = self.log()
+        rows = [r for r in log if r.week == week]
+        if plan is None or not rows:
+            return None
+        load = next((w for w in weekly_loads(log) if w.week == week), None)
+        return review_week(week, plan, rows, load)
+
+    def refresh_exports(self, from_week: date) -> int:
+        """Rewrite calendar and watch files from `from_week` on (targets have changed)."""
+        count = 0
+        for wk in self.plans().weeks():
+            plan = self.plan(wk) if wk >= from_week else None
+            if plan is not None:
+                export_week(plan, self.out / str(wk), self.cfg.timezone, self.cfg.profile)
+                count += 1
+        return count
+
+    def fitness_status(self, today: date) -> list[dict[str, Any]]:
+        """Per sport: the current number, when it was measured, when the next test is due,
+        and every past result."""
+        log = self.log()
+        reference = self._first_week(log) or today
+        history = FitnessLog(self.out / "fitness.jsonl").rows()
+        out = []
+        for sport in FITNESS_SPORTS:
+            rows = [h for h in history if h["sport"] == sport]
+            for prev, cur in pairwise(rows):
+                faster = cur["value"] < prev["value"] if sport != "bike" \
+                    else cur["value"] > prev["value"]
+                cur["trend"] = "same" if cur["value"] == prev["value"] else (
+                    "better" if faster else "worse")
+            due = next_due(self.cfg, sport, reference)
+            known = describe(self.cfg.profile, sport)
+            out.append({
+                "sport": sport, "name": FITNESS_NAMES[sport], "current": known,
+                "tested": self.cfg.profile.tested.get(sport),
+                "can_test": can_test(self.cfg, sport), "enabled": self.cfg.fitness_tests,
+                "due": due, "due_now": known is None or (due is not None and due <= today),
+                "history": list(reversed(rows)),
+            })
+        return out
+
+    def rate_session(self, week: date, session_id: str, rpe: int) -> LogRow:
+        """Say how hard a logged session felt (1–10), e.g. after a watch import."""
+        if not 1 <= rpe <= 10:
+            raise PlannerError("Effort is a number from 1 (very easy) to 10 (flat out).")
+        log = self.log()
+        for i, r in enumerate(log):
+            if r.week == week and r.session_id == session_id and r.completed_min:
+                log[i] = r.model_copy(update={"rpe": rpe})
+                write_log(self.log_path, log)
+                return log[i]
+        raise PlannerError("Log the session as done first, then rate it.")
 
     def report_pain(self, week: date, session_id: str) -> LogRow:
         """Mark a logged session as painful (e.g. after a watch import, which can't know)."""
@@ -625,7 +793,9 @@ class Workspace:
         flat (no evidence, no growth); weeks still to come assume you complete them.
         """
         cfg = self.cfg
-        summaries = {s.week: s for s in weekly_summaries(self.log())}
+        log = self.log()
+        summaries = {s.week: s for s in weekly_summaries(log)}
+        loads = {w.week: w for w in weekly_loads(log)}
         hours = cfg.profile.current_hours or DEFAULT_HOURS[cfg.race]
         this_week = week_start(today)
         history: list[int] = []
@@ -636,11 +806,16 @@ class Workspace:
             recovery = phase != "taper" and is_recovery_week(wk, cfg.race_date)
             available = sum(k.minutes for k in calendar_for_week(cfg, wk))
             prev = max(history[-2:]) if history else None
-            projected = sum(weekly_targets(cfg.race, phase, available, prev, 0.10,
+            # A week that felt very hard is followed by a week that holds, not grows.
+            before = loads.get(wk - timedelta(days=7))
+            held = bool(before and before.hard and wk - timedelta(days=7) < this_week)
+            ramp = 0.0 if held else 0.10
+            projected = sum(weekly_targets(cfg.race, phase, available, prev, ramp,
                                            weekly_hours=hours, recovery=recovery,
                                            strength=cfg.strength).values())
             out.append(ChainStep(week=wk, phase=phase, recovery=recovery, available=available,
-                                 prev=prev, projected=projected))
+                                 prev=prev, projected=projected, ramp=ramp,
+                                 held_after_rpe=before.mean_rpe if held and before else None))
             summ = summaries.get(wk)
             if wk < this_week:
                 reliable = summ is not None and summ.response_rate >= LOW_RESPONSE \
@@ -663,6 +838,8 @@ class ChainStep(BaseModel):
     available: int
     prev: int | None  # the volume this week ramps from
     projected: int
+    ramp: float = 0.10
+    held_after_rpe: float | None = None  # last week's average effort, if it forced a hold
 
 
 class SyncStatus(BaseModel):

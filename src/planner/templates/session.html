@@ -11,6 +11,31 @@
   <a class="btn" href="{{ url_for('week_view', w=week) }}">Week</a>
 </div>
 {{ full(c, url_for('session_detail', week=week, sid=c.s.id), detail=True) }}
+{% if c.s.kind == 'test' %}
+  {% set sport = c.s.discipline %}
+  <section class="card" id="result" style="padding:16px 20px">
+    <b>{{ 'Result saved' if result_done else 'Your result' }}</b>
+    <p class="small muted" style="margin:6px 0 12px">{% if result_done %}Your zones already use this test. Enter it again to correct it.{% else %}Enter it once you've done the test. Your zones, every planned session and your watch files update straight away.{% endif %}</p>
+    <form method="post" action="{{ url_for('fitness_result') }}">
+      <input type="hidden" name="token" value="{{ token }}">
+      <input type="hidden" name="sport" value="{{ sport }}">
+      <input type="hidden" name="on" value="{{ c.p.slot.on }}">
+      <input type="hidden" name="next" value="{{ url_for('session_detail', week=week, sid=c.s.id) }}">
+      <div class="grid" style="max-width:520px">
+        {% if sport == 'run' %}
+          <label>5k time<input type="text" name="time" placeholder="{{ mmss(profile.run_5k) if profile.run_5k else '23:15' }}" inputmode="numeric" required></label>
+        {% elif sport == 'swim' %}
+          <label>400m time<input type="text" name="t400" placeholder="{{ mmss(profile.swim_400) if profile.swim_400 else '7:20' }}" inputmode="numeric" required></label>
+          <label>200m time<input type="text" name="t200" placeholder="{{ mmss(profile.swim_200) if profile.swim_200 else '3:30' }}" inputmode="numeric" required></label>
+        {% else %}
+          <label>Average power for the 20 minutes<input type="number" name="p20" min="60" max="600" placeholder="{{ (profile.ftp / 0.95)|round|int if profile.ftp else '230' }}" required>
+            <span class="hint">Your FTP is set to 95% of this.</span></label>
+        {% endif %}
+      </div>
+      <div style="margin-top:12px"><button class="primary">Save result</button></div>
+    </form>
+  </section>
+{% endif %}
 {% if move_days %}
   <details class="card" style="padding:16px 20px" {{ 'open' if request.args.get('move') }}>
     <summary style="cursor:pointer;font-weight:600">Move this session</summary>

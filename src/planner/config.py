@@ -182,6 +182,7 @@ class AthleteConfig(BaseModel):
     timezone: str = "Europe/London"
     profile: Profile = Profile()
     strength: bool = True  # False = no strength sessions; their time goes to swim/bike/run
+    fitness_tests: bool = True  # schedule a 5k / CSS / FTP test when a number is missing or old
     # Alternate facility-aware and time-only weeks from this Monday (the experiment).
     experiment_start: date | None = None
     # Optional: the watch's activity folder when it's plugged in, e.g.

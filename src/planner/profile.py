@@ -15,6 +15,7 @@ swim paces from CSS. Without a number, the target falls back to how it should fe
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Literal
 
 from pydantic import BaseModel, field_validator, model_validator
@@ -122,6 +123,8 @@ class Profile(BaseModel):
     ftp: int | None = None  # watts
     threshold_hr: int | None = None
     max_hr: int | None = None
+    # When each number was last measured: {"run": date, "swim": date, "bike": date}.
+    tested: dict[str, date] = {}
 
     @field_validator("run_5k", "swim_css", "swim_400", "swim_200", mode="before")
     @classmethod

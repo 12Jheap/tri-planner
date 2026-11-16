@@ -154,6 +154,8 @@
 
   <fieldset>
     <legend>Sessions</legend>
+    <label class="check"><input type="checkbox" name="no_tests" value="1" {{ 'checked' if not fitness_tests }}> Don't schedule fitness tests</label>
+    <p class="small muted" style="margin:6px 0 10px 28px;max-width:60ch">By default a 5k, swim or bike test replaces one quality session when a number is missing or 8 weeks old, so your zones stay right.</p>
     <label class="check"><input type="checkbox" name="no_strength" value="1" {{ 'checked' if not strength }}> Don't give me strength sessions</label>
     <p class="small muted" style="margin:6px 0 0 28px;max-width:60ch">Their time goes to swim, bike and run instead. Strength work does help you hold form late in a race, so it's worth doing somewhere, even if not from this plan.</p>
   </fieldset>
@@ -204,6 +206,13 @@
   </form>
 </fieldset>
 
+<h2 id="backup">Backups</h2>
+<fieldset>
+  <legend>Your data</legend>
+  <p class="lead">Your settings and all your training history. A copy is saved here every day (<code>{{ out_dir }}{{ '/' }}backups</code>, newest 14 kept){% if last_backup %}; the last one was {{ last_backup.strftime('%d %b') }}{% endif %}. A backup on the same computer doesn't survive that computer, so download one now and then and keep it somewhere else. It never includes your Garmin key.</p>
+  <a class="btn" href="{{ url_for('backup_zip') }}">Download backup</a>
+</fieldset>
+
 <details {{ 'open' if show_raw }} style="margin-top:28px">
   <summary class="btn">Settings file</summary>
   <form method="post" action="{{ url_for('setup_save') }}" style="margin-top:12px">
@@ -214,6 +223,8 @@
     <div class="row" style="margin-top:10px"><button class="primary">Save file</button></div>
   </form>
 </details>
+
+<p class="small muted" style="margin-top:24px">tri-planner version <code>{{ version }}</code></p>
 
 <template id="slot-tpl">{{ slot_row('__DAY__', None) }}</template>
 <template id="loc-tpl">{{ location_block('__I__', None) }}</template>

@@ -373,3 +373,22 @@ table.data td.feel { color: var(--muted); }
 .effort-note { font-weight: 500; font-size: 13px; color: var(--bad); margin-top: 4px; }
 :root { --z-race: #8fb7a4; }
 .z-race { background: var(--z-race); }
+
+/* ---------- effort rating ---------- */
+.rpe { display: inline-flex; gap: 4px; flex-wrap: wrap; margin: 6px 0 4px; }
+.rpe button, .rpe.pick span { min-width: 32px; height: 32px; padding: 0 6px; font-size: 13px;
+  font-weight: 600; border-radius: 6px; display: inline-grid; place-items: center;
+  border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; }
+.rpe.pick label { display: inline-block; }
+.rpe.pick input { position: absolute; opacity: 0; width: 0; height: 0; }
+.rpe.pick input:checked + span { background: var(--btn); color: var(--btn-ink);
+  border-color: var(--btn); }
+.rpe.pick input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+.rate { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.lbl { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+
+/* ---------- week review ---------- */
+.review { border: 1px solid var(--line); border-left: 3px solid var(--ink); background: var(--surface);
+          border-radius: var(--r); padding: 16px 20px; margin: 0 0 20px; }
+.review .verdict { font-size: 16px; font-weight: 600; margin: 0; max-width: 60ch; }
+table.data tr.hist td { border-bottom: 0; padding: 2px 8px 2px 0; font-size: 13px; }

@@ -89,6 +89,8 @@ TITLES: dict[tuple[str, str], str] = {
     ("run", "threshold"): "Threshold run", ("run", "vo2"): "VO2 run",
     ("run", "openers"): "Openers run",
     ("strength", "strength"): "Strength",
+    ("run", "test"): "5k time trial", ("bike", "test"): "FTP test",
+    ("swim", "test"): "CSS swim test",
 }
 
 # Why you're doing it, in one or two sentences.
@@ -119,6 +121,8 @@ PURPOSE: dict[str, str] = {
     "strength": "Bodyweight strength and stability. Makes you more robust and helps you "
     "hold form when tired.",
     "substitute": "Stands in for a session you can't do right now. Keep it easy to steady.",
+    "test": "A fitness test. It resets your training zones, so every session after it is "
+    "aimed at the right effort. Go in fresh, pace it evenly, and enter your result afterwards.",
 }
 
 

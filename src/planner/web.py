@@ -31,13 +31,14 @@ from flask import (
 )
 from werkzeug.wrappers import Response
 
-from planner import garmin
+from planner import backup, garmin
 from planner.activities import ImportResult
 from planner.adherence import AdherenceModel, LogRow, weekly_summaries
 from planner.config import DAYS, ConfigError, Facility, parse_config, week_start
 from planner.friendly import parse_injury
 from planner.garmin import Fetcher, Getter
-from planner.profile import ZONE_NAMES, mmss
+from planner.load import weekly_loads
+from planner.profile import ZONE_NAMES, mmss, parse_duration
 from planner.report import completion_by, week_type
 from planner.service import PlannerError, Workspace, effort_note, placements_on, slot_label
 from planner.sessions import how_to
@@ -76,6 +77,42 @@ def _windows_text(windows: list[Any]) -> str:
         days = ",".join(w.days) if w.days else ""
         parts.append(f"{days} {w.start:%H:%M}-{w.end:%H:%M}".strip())
     return "; ".join(parts)
+
+
+def app_version() -> str:
+    """Short git commit of the running code (so you can tell if a server needs updating)."""
+    git = HERE.parents[1] / ".git"
+    try:
+        head = (git / "HEAD").read_text("utf-8").strip()
+        if head.startswith("ref: "):
+            ref = head[5:]
+            ref_file = git / ref
+            if ref_file.exists():
+                head = ref_file.read_text("utf-8").strip()
+            else:
+                packed = (git / "packed-refs").read_text("utf-8")
+                head = next(line.split()[0] for line in packed.splitlines()
+                            if line.endswith(" " + ref))
+        return head[:7]
+    except (OSError, StopIteration):
+        return "unknown"
+
+
+RPE_WORDS = {1: "very easy", 2: "very easy", 3: "easy", 4: "easy", 5: "steady", 6: "steady",
+             7: "hard", 8: "hard", 9: "very hard", 10: "flat out"}
+# Which profile fields belong to which test, to notice a number you've just re-measured.
+MEASURED = {"run": ("run_5k",), "swim": ("swim_css", "swim_400", "swim_200"), "bike": ("ftp",)}
+
+
+def _same_number(key: str, a: Any, b: Any) -> bool:
+    def norm(v: Any) -> Any:
+        if v in (None, ""):
+            return None
+        try:
+            return parse_duration(v) if key != "ftp" else int(float(v))
+        except (ValueError, TypeError):
+            return str(v)
+    return bool(norm(a) == norm(b))
 
 
 def _dur(seconds: int) -> str:
@@ -137,6 +174,7 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
             "token": token, "how_to": how_to, "fmt_min": _fmt_min, "nice": _nice,
             "reasons": REASON_TEXT, "nav": request.endpoint, "zone_names": ZONE_NAMES,
             "mmss": mmss, "dur": _dur, "garmin_ready": garmin_connected(),
+            "rpe_words": RPE_WORDS,
         }
 
     @app.before_request
@@ -183,9 +221,16 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
                 for i in ws.injuries().active(day)]
 
     # ---- pages ------------------------------------------------------------------------
+    def daily_backup() -> None:
+        try:
+            backup.auto_backup(ws.config_path, ws.out, clock().date())
+        except OSError:
+            app.logger.exception("Automatic backup failed")
+
     @app.get("/")
     def today() -> str:
         auto_sync()
+        daily_backup()
         now_ = clock()
         day = date.fromisoformat(request.args["d"]) if request.args.get("d") else now_.date()
         week = week_start(day)
@@ -208,6 +253,10 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
             wellness=ws.wellness(day), sync=ws.sync_status(),
             can_ease=[c for c in cards if not c["row"] and c["s"].intensity >= 3
                       and c["s"].discipline != "strength"],
+            pending=ws.pending_results(now_.date()) if day == now_.date() else [],
+            # From Friday, nudge to plan next week if it isn't planned yet.
+            plan_next=(week + timedelta(days=7)) if day == now_.date() and now_.weekday() >= 4
+            and plan is not None and ws.plan(week + timedelta(days=7)) is None else None,
         )
 
     @app.get("/week")
@@ -241,6 +290,11 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
             test_week=(not plan.facility_aware) if plan
             else week_type(week, ws.cfg.experiment_start) == "time_only",
             experiment=ws.cfg.experiment_start,
+            # A week gets its review once it's over, or on its Sunday.
+            review=ws.week_review(week) if plan and (
+                week < week_start(now_.date())
+                or (week == week_start(now_.date()) and now_.weekday() == 6)) else None,
+            next_planned=ws.plan(week + timedelta(days=7)) is not None,
         )
 
     @app.get("/s/<week>/<sid>")
@@ -263,7 +317,32 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
             assert o.slot.on is not None
             by_day[o.slot.on].append(o)
         return render_template("session.html", c=c, week=wk, known=ws.cfg.profile.known,
-                               move_days=dict(sorted(by_day.items())))
+                               move_days=dict(sorted(by_day.items())),
+                               result_done=p.session.kind == "test" and p.slot.on is not None
+                               and ws.cfg.profile.tested.get(p.session.discipline, date.min)
+                               >= p.slot.on,
+                               profile=ws.cfg.profile)
+
+    @app.post("/fitness/result")
+    def fitness_result() -> Response:
+        f = request.form
+        sport = f["sport"]
+        on = date.fromisoformat(f["on"]) if f.get("on") else clock().date()
+        change = ws.record_test(sport, {k: f.get(k, "") for k in ("time", "t400", "t200", "p20")},
+                                min(on, clock().date()))
+        flash(f"Saved. {change.text} Every session and your watch files now use it.", "ok")
+        return redirect(f.get("next") or url_for("progress") + "#fitness")
+
+    @app.get("/backup.zip")
+    def backup_zip() -> Response:
+        data = backup.backup_bytes(ws.config_path, ws.out)
+        return send_file(io.BytesIO(data), as_attachment=True, mimetype="application/zip",
+                         download_name=f"tri-planner-backup-{clock().date()}.zip")
+
+    @app.get("/calendar.ics")
+    def calendar_feed() -> Response:
+        return Response(ws.calendar_feed(clock().date()), mimetype="text/calendar",
+                        headers={"Cache-Control": "no-cache"})
 
     @app.post("/move")
     def move() -> Response:
@@ -415,6 +494,9 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
             ws.report_pain(week, f["session"])
             flash("Pain noted. Two sessions in a row with pain pauses that sport until "
                   "a physio clears you.", "info")
+        elif action == "rate":
+            ws.rate_session(week, f["session"], int(f.get("rpe") or 0))
+            flash("Effort saved.", "ok")
         elif action == "skipped":
             ws.log_session(week, f["session"], "skipped", reason=f.get("reason") or "other")
             flash("Logged as skipped.", "ok")
@@ -423,8 +505,10 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
             if mins and not mins.isdigit():
                 raise PlannerError("Minutes should be a number.")
             status = "moved" if f.get("other_time") else "done"
+            rpe = f.get("rpe", "").strip()
             row = ws.log_session(week, f["session"], status,  # type: ignore[arg-type]
-                                 minutes=int(mins) if mins else None, pain=bool(f.get("pain")))
+                                 minutes=int(mins) if mins else None, pain=bool(f.get("pain")),
+                                 rpe=int(rpe) if rpe.isdigit() else None)
             flash(f"Logged {row.actual_min} min.", "ok")
             if row.pain:
                 flash("Pain noted. Two sessions in a row with pain pauses that sport until "
@@ -483,8 +567,11 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
                  for k in sorted(model.counts, key=lambda k: -model.p(k))]
         by_sport = completion_by(log, "discipline")
         by_type = completion_by(log, "week_type")
+        loads = {w.week: w for w in weekly_loads(log)}
         return render_template("progress.html", weeks=weeks, slots=slots, by_sport=by_sport,
-                               by_type=by_type, label=slot_label)
+                               by_type=by_type, label=slot_label, loads=loads,
+                               fitness=ws.fitness_status(clock().date()),
+                               top_load=max([w.load or 0 for w in loads.values()] + [1]))
 
     @app.get("/files/<week>/<kind>")
     def files(week: str, kind: str) -> Response:
@@ -546,6 +633,9 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
             experiment=cfg.experiment_start.isoformat() if cfg and cfg.experiment_start else "",
             watch_folder=cfg.watch_folder or "" if cfg else "",
             strength=cfg.strength if cfg else True,
+            fitness_tests=cfg.fitness_tests if cfg else True,
+            last_backup=backup.last_backup(ws.out), version=app_version(),
+            out_dir=ws.out.resolve(),
             next_monday=week_start(clock().date()) + timedelta(days=7),
             garmin_lib=garmin.library_installed(), garmin_key=garmin.key_available(),
             key_file=garmin.KEY_FILE, sync=ws.sync_status() if cfg else None,
@@ -569,8 +659,20 @@ def create_app(ws: Workspace, now: Callable[[], datetime] | None = None,
                     profile[k] = float(v) if k == "current_hours" else int(v)
                 except ValueError:
                     raise ValueError(f"{k.replace('_', ' ')} should be a number") from None
+        # Keep the dates each number was measured; a number you've just changed is new today.
+        old = data.get("profile") or {}
+        tested = dict(old.get("tested") or {})
+        for sport, keys in MEASURED.items():
+            changed = any(not _same_number(k, old.get(k), profile.get(k)) for k in keys)
+            if changed and any(profile.get(k) for k in keys):
+                tested[sport] = clock().date()
+        if tested:
+            profile["tested"] = tested
         data["profile"] = profile
         data.setdefault("timezone", "Europe/London")
+        data.pop("fitness_tests", None)
+        if f.get("no_tests"):
+            data["fitness_tests"] = False
         data.pop("experiment_start", None)
         if f.get("experiment") and f.get("experiment_start"):
             data["experiment_start"] = date.fromisoformat(f["experiment_start"])
@@ -655,6 +757,15 @@ def serve(config: Path, out: Path, host: str = "127.0.0.1", port: int = 8000,
     if host == "0.0.0.0":
         print("Open it on your phone at http://<this computer's IP>:" + str(port) +
               " — anyone on this wifi can reach it, so only do this on networks you trust.")
+    try:
+        backup.auto_backup(config, out, datetime.now().date())  # noqa: DTZ005 (local day)
+    except OSError as err:
+        print(f"(Couldn't write today's backup: {err})")
     if open_browser:
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    app.run(host=host, port=port, debug=False)
+    try:  # a proper server when it's installed; Flask's own is fine for a quick look
+        from waitress import serve as waitress_serve
+    except ImportError:
+        app.run(host=host, port=port, debug=False)
+    else:
+        waitress_serve(app, host=host, port=port, threads=6, ident="tri-planner")

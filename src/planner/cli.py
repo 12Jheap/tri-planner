@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 
 from planner.activities import ImportResult
 from planner.adherence import REASONS, LogRow, read_log
+from planner.backup import make_backup
 from planner.config import AthleteConfig, ConfigError
 from planner.friendly import parse_injury, parse_week
 from planner.garmin import GarminError
@@ -154,8 +155,14 @@ def _ask_and_log(ws: Workspace, r: LogRow, label: str, ask: Ask) -> bool:
             break
         print("  ✗ a number of minutes, please")
     pain = ask("  Anything hurt? [y/N]: ").strip().lower() in ("y", "yes")
+    while True:
+        effort = ask("  How hard was it, 1 (very easy) to 10 (flat out)? [skip]: ").strip()
+        if not effort or (effort.isdigit() and 1 <= int(effort) <= 10):
+            break
+        print("  ✗ a number from 1 to 10, or Enter to skip")
     ws.log_session(r.week, r.session_id, status,  # type: ignore[arg-type]
-                   minutes=int(mins) if mins else None, pain=pain)
+                   minutes=int(mins) if mins else None, pain=pain,
+                   rpe=int(effort) if effort else None)
     return True
 
 
@@ -167,7 +174,7 @@ def cmd_log(a: argparse.Namespace, ask: Ask | None = None) -> int:
         if a.status is None:
             raise PlannerError("Say what happened: --status done, skipped or moved")
         row = ws.log_session(week, a.session, a.status, minutes=a.minutes, reason=a.reason,
-                             pain=a.pain)
+                             pain=a.pain, rpe=a.effort)
         print(f"Logged {a.session}: {status_text(row)}")
         return 0
 
@@ -255,6 +262,16 @@ def cmd_sync(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_backup(a: argparse.Namespace) -> int:
+    ws = _ws(a)
+    dest = Path(a.to).expanduser() if a.to else None
+    path = make_backup(ws.config_path, ws.out, _now(ws.cfg).date(), dest)
+    print(f"Backup written: {path}")
+    print("It holds your settings and everything in out/ (never your Garmin key). "
+          "To restore, unzip it into the tri-planner folder.")
+    return 0
+
+
 def cmd_web(a: argparse.Namespace) -> int:
     from planner.web import serve
 
@@ -318,6 +335,8 @@ def build_parser() -> argparse.ArgumentParser:
     lg.add_argument("--min", dest="minutes", type=int, help="minutes actually done")
     lg.add_argument("--reason", choices=list(REASONS), help="why it was skipped")
     lg.add_argument("--pain", action="store_true", help="something hurt")
+    lg.add_argument("--effort", type=int, choices=range(1, 11), metavar="1-10",
+                    help="how hard it felt: 1 very easy, 10 flat out")
     lg.set_defaults(fn=cmd_log)
 
     r = sub.add_parser("replan", help="re-plan the rest of the week when life happens")
@@ -345,6 +364,11 @@ def build_parser() -> argparse.ArgumentParser:
     common(sy, argparse.SUPPRESS)
     sy.add_argument("--days", type=int, default=14, help="how far back to look (default 14)")
     sy.set_defaults(fn=cmd_sync)
+
+    bk = sub.add_parser("backup", help="save your settings and history to one zip")
+    common(bk, argparse.SUPPRESS)
+    bk.add_argument("--to", help="folder to write it to (default: out/backups)")
+    bk.set_defaults(fn=cmd_backup)
 
     rep = sub.add_parser("report", help="how much of the plan you actually did")
     rep.add_argument("--out", default="out")

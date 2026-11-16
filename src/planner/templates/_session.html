@@ -41,6 +41,7 @@
         {%- if row.avg_hr %} · {{ row.avg_hr }} bpm{% endif %}
         {%- if row.avg_power %} · {{ row.avg_power }} W{% endif %}
         {%- if row.source in ('garmin_personal', 'file') %} <span class="muted" style="font-weight:500">· from {{ 'Garmin' if row.source == 'garmin_personal' else 'watch file' }}</span>{% endif %}
+        {%- if row.rpe %} · effort {{ row.rpe }}/10{% endif %}
         {%- if row.pain %} · pain noted{% endif %}
       {% else %}Skipped · {{ reasons.get(row.reason, row.reason) }}{% endif %}
       {% if c.effort %}<div class="effort-note">{{ c.effort }}</div>{% endif %}
@@ -54,6 +55,18 @@
       <button class="quiet" name="action" value="undo">Undo</button>
     </span>
   </form>
+  {% if row.status in ('done', 'moved') and not row.rpe %}
+  <form method="post" action="{{ url_for('log') }}" class="rate">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="week" value="{{ c.week }}">
+    <input type="hidden" name="session" value="{{ s.id }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <input type="hidden" name="action" value="rate">
+    <span class="small muted">How hard was it?</span>
+    <span class="rpe">{% for n in range(1, 11) %}<button name="rpe" value="{{ n }}" title="{{ rpe_words[n] }}">{{ n }}</button>{% endfor %}</span>
+    <span class="small muted">1 very easy · 10 flat out</span>
+  </form>
+  {% endif %}
 {% elif c.loggable %}
   <div class="log row">
     <details>
@@ -66,6 +79,11 @@
         <label>Minutes done
           <input type="number" name="minutes" min="0" max="600" inputmode="numeric" value="{{ s.duration_min }}">
         </label>
+        <div>
+          <span class="lbl">How hard was it? <span class="hint" style="display:inline">optional</span></span>
+          <span class="rpe pick">{% for n in range(1, 11) %}<label title="{{ rpe_words[n] }}"><input type="radio" name="rpe" value="{{ n }}"><span>{{ n }}</span></label>{% endfor %}</span>
+          <span class="small muted">1 very easy · 5 steady · 10 flat out</span>
+        </div>
         <label class="check"><input type="checkbox" name="pain" value="1"> Something hurt</label>
         <label class="check"><input type="checkbox" name="other_time" value="1"> Did it at a different time</label>
         <div><button class="primary" name="action" value="done">Save</button></div>

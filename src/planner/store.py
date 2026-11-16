@@ -98,6 +98,10 @@ class PlanStore:
                 fh.write(json.dumps(row) + "\n")
         return version
 
+    def weeks(self) -> list[date]:
+        """Every week that has a plan, oldest first."""
+        return sorted({date.fromisoformat(r["week"]) for r in self._rows()})
+
     def load(self, week: date, version: int | None = None) -> Plan | None:
         """Rebuild the plan for `week` (latest version unless given)."""
         rows = [r for r in self._rows() if r["week"] == week.isoformat()]

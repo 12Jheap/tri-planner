@@ -160,8 +160,68 @@ class _Builder:
     def building(self) -> bool:
         return self.s.phase == "build"
 
+    # ---- fitness tests -------------------------------------------------------------
+    def run_test(self) -> list[Block]:
+        m = self.total / 60
+        known = self.p.run_5k
+        trial = (known or 25 * 60) / 60
+        cd = 8 if m - trial >= 25 else 5
+        wu = max(5.0, m - trial - cd - 3)  # 3 minutes of strides before the start
+        last = f"last time {mmss(known)}" if known else "best even effort"
+        return [
+            Block(steps=[self.step("Warm-up", wu, "easy", "finish feeling warm and loose")]),
+            Block(reps=3, steps=[self.step("Stride", 20 / 60, "sprint", "smooth and quick"),
+                                 self.step("Walk back", 40 / 60, "recovery")]),
+            Block(steps=[Step(label="Time trial", seconds=round(trial * 60), zone="vo2",
+                              metres=5000, target=last,
+                              note="5 km as fast as you can pace evenly: the first km should "
+                                   "feel too easy. Flat route or a track. Note your time.")]),
+            Block(steps=[self.step("Cool-down", cd, "easy")]),
+        ]
+
+    def bike_test(self) -> list[Block]:
+        m = self.total / 60
+        cd, primer = (10, 5) if m >= 55 else (7, 3)
+        wu = max(8.0, m - 20 - cd - primer)
+        ftp = self.p.ftp
+        aim = f"start around {ftp}–{round(ftp * 1.05)} W" if ftp \
+            else "as hard as you can hold evenly for 20 minutes"
+        test = self.step("All-out test", 20, "threshold",
+                         "All out but even: don't sprint the start, lift in the last 5 "
+                         "minutes. Note your average power for the 20 minutes.")
+        test.target = aim
+        return [
+            Block(steps=[self.step("Warm-up", wu, "easy",
+                                   "include 3 × 1 min fast in the last 10 minutes")]),
+            Block(steps=[self.step("Easy spin", primer, "recovery")]),
+            Block(steps=[test]),
+            Block(steps=[self.step("Cool-down", cd, "easy")]),
+        ]
+
+    def swim_test(self) -> list[Block]:
+        def trial(metres: int, known: int | None, note: str) -> Block:
+            b = self.swim_set("Time trial", 1, metres, "vo2", 0, note)
+            b.steps[0].target = f"last time {mmss(known)}" if known else "best even effort"
+            return b
+
+        blocks = [
+            self.swim_set("Easy", 1, 300, "easy", 0, "relaxed, mix in some backstroke"),
+            self.swim_set("Build", 4, 50, "steady", 15, "each one a little faster"),
+            trial(400, self.p.swim_400, "400 m as fast as you can hold evenly. Push off the "
+                                        "wall, no dive. Note your time."),
+            Block(steps=[Step(label="Easy swim or rest", seconds=300, zone="recovery",
+                              note="5 minutes: get your breath all the way back")]),
+            trial(200, self.p.swim_200, "200 m all out. Note your time."),
+        ]
+        left = self.total - sum(b.seconds for b in blocks)
+        easy = int(100 / 100 * self.p.swim_speed("easy"))
+        blocks.append(self.swim_set("Easy", 1, 100 * max(1, min(4, left // easy)), "easy", 0))
+        return blocks
+
     def run(self) -> list[Block]:
         k, m = self.s.kind, self.total / 60
+        if k == "test":
+            return self.run_test()
         if self.half and k == "long" and m >= 75:
             fuel = "practise race fuelling: a gel or drink every 30 minutes"
             if self.building:  # finish at the pace you'll race the half marathon
@@ -202,6 +262,8 @@ class _Builder:
     # ---- bike ----------------------------------------------------------------------
     def bike(self) -> list[Block]:
         k, m = self.s.kind, self.total / 60
+        if k == "test":
+            return self.bike_test()
         fuel = "practise race fuelling: 60–90 g of carbs an hour, drink every 15 minutes"
         if self.half and k == "long" and m >= 120 and self.building:
             reps = int(min(3, (m - 30) // 30))
@@ -284,6 +346,8 @@ class _Builder:
 
     def swim(self) -> list[Block]:
         k, m = self.s.kind, self.total / 60
+        if k == "test":
+            return self.swim_test()
         short = m < 35
         wu = self.swim_set("Easy", 1, 200 if short else 400, "easy", 0, "mix in some backstroke")
         cd = self.swim_set("Easy", 1, 100 if short else 200, "easy", 0)

@@ -22,6 +22,30 @@
 {% if test_week %}<div class="msg"><b>Time-only test week.</b> Like most apps, this week's plan ignores where the kit is. Train what you can and log honestly: comparing these weeks with normal ones is the experiment.</div>{% endif %}
 {% if race_in_week %}<div class="msg">Race week. Race on {{ race_in_week.strftime('%A %d %B') }}.</div>{% endif %}
 
+{% if review %}
+<section class="review" aria-label="Week review">
+  <div class="eyebrow" style="margin-bottom:8px">Week review</div>
+  <p class="verdict">{{ review.verdict }}</p>
+  <div class="stats" style="margin-top:10px">
+    <div class="stat"><div class="v tnum">{{ (review.ratio * 100)|round|int }}%</div><div class="k">{{ fmt_min(review.done_min) }} of {{ fmt_min(review.planned_min) }}</div></div>
+    <div class="stat"><div class="v tnum">{{ review.key_done }}/{{ review.key_total }}</div><div class="k">key sessions</div></div>
+    {% if review.mean_rpe %}<div class="stat"><div class="v tnum">{{ review.mean_rpe }}</div><div class="k">average effort /10</div></div>{% endif %}
+    {% if review.unlogged %}<div class="stat"><div class="v tnum">{{ review.unlogged }}</div><div class="k">not logged</div></div>{% endif %}
+  </div>
+  <div class="sportkey" style="margin-top:8px">
+    {% for sp, dp in review.by_sport.items() %}<span class="sport s-{{ sp }}" style="text-transform:none;letter-spacing:0;font-weight:500;font-size:13px">{{ sp|capitalize }} <b>{{ fmt_min(dp[0]) }}</b> of {{ fmt_min(dp[1]) }}</span>{% endfor %}
+  </div>
+  {% if review.skipped %}<p class="small muted" style="margin-top:10px">Skipped: {% for title, reason in review.skipped %}{{ title }} ({{ reasons.get(reason, reason)|lower }}){{ ', ' if not loop.last }}{% endfor %}.{% if review.top_reason %} Most common reason: {{ reasons.get(review.top_reason, review.top_reason)|lower }}.{% endif %}</p>{% endif %}
+  {% if not next_planned %}
+    <form method="post" action="{{ url_for('plan_week') }}" style="margin-top:12px">
+      <input type="hidden" name="token" value="{{ token }}">
+      <input type="hidden" name="week" value="{{ next }}">
+      <button class="primary">Plan the week of {{ next.strftime('%d %b') }}</button>
+    </form>
+  {% endif %}
+</section>
+{% endif %}
+
 {% if not plan %}
   <div class="empty">
     <h3>Nothing planned for this week</h3>
@@ -61,6 +85,7 @@
         {% if has_files %}<a class="btn" href="{{ url_for('files', week=week, kind='plan.ics') }}">Calendar file (.ics)</a>{% endif %}
         {% if fits %}<a class="btn" href="{{ url_for('files', week=week, kind='workouts.zip') }}">{{ fits }} Garmin workouts (.zip)</a>{% endif %}
       </div>
+      <p class="small muted" style="max-width:60ch">Or subscribe once and never download again: add <code>{{ url_for('calendar_feed', _external=True) }}</code> as a calendar subscription on your phone (it needs to reach this server, so home wifi or Tailscale).</p>
       <p class="small muted" style="max-width:60ch">Calendar: open the file, or in Google Calendar use Settings → Import. Each event has the full workout.
         Garmin: unzip and copy the .fit files to <code>GARMIN/NewFiles</code> on the watch over USB. Steps carry your pace, power or heart-rate targets.</p>
     </div>

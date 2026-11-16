@@ -7,10 +7,10 @@ dependencies = ["ortools>=9.10", "pydantic>=2", "pyyaml", "pandas", "scipy", "ic
 
 [project.optional-dependencies]
 fit = ["fit-tool"]
-web = ["flask>=3"]
+web = ["flask>=3", "waitress>=3"]
 # Garmin's Personal API client (Python 3.12+): `tri-plan sync` and "Sync from Garmin".
 garmin = ["garmin-connect-personal-api-python>=1.0; python_version >= '3.12'"]
-dev = ["pytest", "ruff", "mypy", "types-PyYAML", "pandas-stubs", "flask>=3"]
+dev = ["pytest", "ruff", "mypy", "types-PyYAML", "pandas-stubs", "flask>=3", "waitress>=3"]
 
 [project.scripts]
 tri-plan = "planner.cli:main"
@@ -23,7 +23,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-planner = ["templates/*.html", "static/*"]
+planner = ["templates/*.html", "static/*", "static/icons/*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "tests"]

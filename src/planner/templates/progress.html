@@ -4,8 +4,26 @@
 {% block body %}
 <div class="head"><div><div class="eyebrow">Completed ÷ planned</div><h1>Progress</h1></div></div>
 
+<h2 id="fitness" style="margin-top:8px">Fitness</h2>
+<p class="small muted" style="max-width:62ch">The three numbers every target comes from. A test is planned when one is missing or 8 weeks old{{ '' if fitness[0].enabled else ' (switched off on Profile)' }}.</p>
+<table class="data">
+  <tr><th>Number</th><th>Now</th><th>Measured</th><th>Next test</th></tr>
+  {% for f in fitness %}
+    <tr>
+      <td class="zname"><span class="sport s-{{ f.sport }}" style="font-size:12px">{{ f.name }}</span></td>
+      <td>{{ f.current or '—' }}</td>
+      <td class="muted">{{ f.tested.strftime('%d %b %Y') if f.tested else ('not dated' if f.current else 'never') }}</td>
+      <td class="muted">{% if not f.can_test %}can't measure here{% elif not f.enabled %}off{% elif f.due_now %}<b style="color:var(--ink)">due</b>{% else %}{{ f.due.strftime('%d %b') }}{% endif %}</td>
+    </tr>
+    {% for h in f.history[:4] %}
+      <tr class="hist"><td></td><td class="tnum">{{ h.text }}</td><td class="muted">{{ h.on }}</td>
+        <td class="muted">{{ {'better': 'faster' if f.sport != 'bike' else 'stronger', 'worse': 'slower' if f.sport != 'bike' else 'lower', 'same': 'same'}.get(h.trend, 'first test') }}</td></tr>
+    {% endfor %}
+  {% endfor %}
+</table>
+
 {% if not weeks %}
-  <div class="empty"><h3>Nothing to show yet</h3><p class="muted">Plan a week and log a few sessions.</p></div>
+  <div class="empty" style="margin-top:24px"><h3>Nothing to show yet</h3><p class="muted">Plan a week and log a few sessions.</p></div>
 {% else %}
   {% set latest = weeks[0] %}
   <div class="stats">
@@ -21,10 +39,13 @@
       <div class="track"><i class="{{ 'weak' if s.low_response }}" style="width: {{ [s.ratio * 100, 100]|min }}%"></i></div>
       <span style="text-align:right">{{ (s.ratio * 100)|round|int }}%</span>
     </div>
-    <div class="small muted" style="margin:-6px 0 4px 82px">{{ fmt_min(s.completed_min) }} of {{ fmt_min(s.planned_min) }} · {{ s.logged }}/{{ s.sessions }} logged{% if s.low_response %} · under 70% logged, so read with caution{% endif %}</div>
+    <div class="small muted" style="margin:-6px 0 4px 82px">{{ fmt_min(s.completed_min) }} of {{ fmt_min(s.planned_min) }} · {{ s.logged }}/{{ s.sessions }} logged{% if s.low_response %} · under 70% logged, so read with caution{% endif %}
+      {%- set L = loads.get(s.week) %}{% if L and L.load %} · load {{ L.load }}{{ ' (est.)' if L.estimated }} · effort {{ L.mean_rpe }}/10{% if L.spike %} · <span style="color:var(--bad)">big jump on recent weeks</span>{% endif %}{% if L.hard %} · <span style="color:var(--bad)">felt very hard: next week holds volume</span>{% endif %}{% endif %}</div>
   {% endfor %}
   </div>
   <p class="small muted">Target: 50% or more for 6 weeks in a row.</p>
+
+  <p class="small muted" style="max-width:62ch">Load is minutes × effort (the 1–10 you give each session). It shows what a week took out of you, not just how long it was.</p>
 
   <h2>By sport</h2>
   <div class="bars">

@@ -38,14 +38,15 @@ def _describe(p: Placement, profile: Profile | None = None) -> str:
     return "\n".join(lines)
 
 
-def to_ics(plan: Plan, path: str | Path, tz: str = "Europe/London",
-           profile: Profile | None = None) -> Path:
+def ics_bytes(placements: list[Placement], tz: str = "Europe/London",
+              profile: Profile | None = None) -> bytes:
+    """An iCalendar file with one event per session (any number of weeks)."""
     zone = ZoneInfo(tz)
     cal = Calendar()
     cal.add("prodid", "-//tri-planner//v0//EN")
     cal.add("version", "2.0")
     cal.add("x-wr-calname", "Training plan")
-    for p in plan.placements:
+    for p in placements:
         ev = Event()
         ev.add("uid", f"{p.session.id}-{p.slot.on}@tri-planner")
         ev.add("summary", p.session.label)
@@ -55,8 +56,13 @@ def to_ics(plan: Plan, path: str | Path, tz: str = "Europe/London",
         ev.add("description", _describe(p, profile))
         ev.add("dtstamp", dt.datetime.now(tz=zone))
         cal.add_component(ev)
+    return cal.to_ical()
+
+
+def to_ics(plan: Plan, path: str | Path, tz: str = "Europe/London",
+           profile: Profile | None = None) -> Path:
     out = Path(path)
-    out.write_bytes(cal.to_ical())
+    out.write_bytes(ics_bytes(plan.placements, tz, profile))
     return out
 
 

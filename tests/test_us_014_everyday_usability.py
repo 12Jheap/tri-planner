@@ -228,13 +228,13 @@ def test_ac_062_log_command_records_sessions_interactively_or_in_one_line(tmp_pa
     monkeypatch.setattr(cli, "_now", lambda _cfg: datetime(2026, 11, 10, 21, 0))
     todo = [r.session_id for r in read_log(out / "log.csv") if r.on <= date(2026, 11, 10)]
     assert len(todo) >= 2
-    # First session: done, 25 minutes, sore. Second: skipped, pool closed. Rest: later.
-    answers = iter(["d", "25", "y", "s", "2"])
+    # First session: done, 25 minutes, sore, effort 7. Second: skipped, pool closed. Rest: later.
+    answers = iter(["d", "25", "y", "7", "s", "2"])
     monkeypatch.setattr("builtins.input", lambda _p: next(answers, ""))
     assert cli.main(["log", str(joe), "--out", str(out)]) == 0
     rows = {r.session_id: r for r in read_log(out / "log.csv")}
     first, second = rows[todo[0]], rows[todo[1]]
-    assert (first.status, first.actual_min, first.pain) == ("done", 25, True)
+    assert (first.status, first.actual_min, first.pain, first.rpe) == ("done", 25, True, 7)
     assert (second.status, second.reason) == ("skipped", "facility_closed")
     assert all(not rows[sid].logged for sid in todo[2:])  # Enter = later
     sid = next(r.session_id for r in read_log(out / "log.csv") if r.on == date(2026, 11, 14))

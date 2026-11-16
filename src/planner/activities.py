@@ -40,6 +40,7 @@ class Activity(BaseModel):
     distance_m: int | None = None
     avg_hr: int | None = None
     avg_power: int | None = None
+    rpe: int | None = None  # the watch's "how did that feel?" answer, 1–10
 
     @property
     def minutes(self) -> int:
@@ -76,6 +77,14 @@ def _local(ms: float, tz: str) -> datetime:
     return datetime.fromtimestamp(ms / 1000, UTC).astimezone(ZoneInfo(tz)).replace(tzinfo=None)
 
 
+def _watch_rpe(raw: object) -> int | None:
+    """Garmin stores perceived effort as 10–100 (10 per point); we use 1–10."""
+    if not isinstance(raw, int | float) or isinstance(raw, bool) or raw <= 0:
+        return None
+    value = round(raw / 10) if raw > 10 else round(raw)
+    return value if 1 <= value <= 10 else None
+
+
 def parse_fit(data: bytes, tz: str = "Europe/London", activity_id: str | None = None
               ) -> list[Activity]:
     """Sessions in a FIT activity file (a multisport file has several)."""
@@ -107,6 +116,7 @@ def parse_fit(data: bytes, tz: str = "Europe/London", activity_id: str | None = 
             distance_m=int(m.total_distance) if m.total_distance else None,
             avg_hr=int(m.avg_heart_rate) if m.avg_heart_rate else None,
             avg_power=int(m.avg_power) if m.avg_power else None,
+            rpe=_watch_rpe(m.workout_rpe),
         ))
     return out
 
@@ -206,6 +216,7 @@ def apply_matches(log: list[LogRow], result: ImportResult, source: Source) -> li
             "status": "moved" if m.moved else "done",
             "actual_min": a.minutes + m.extra_minutes,
             "avg_hr": a.avg_hr, "avg_power": a.avg_power, "distance_m": a.distance_m,
+            "rpe": a.rpe,
             "source": source, "activity_id": "+".join([a.activity_id, *m.extra_ids]),
         }))
     return out

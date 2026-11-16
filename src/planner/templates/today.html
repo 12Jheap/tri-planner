@@ -38,6 +38,11 @@
 </div>
 {% endif %}
 
+{% for wk, p in pending %}
+  <div class="msg ok">You did your {{ p.session.title|lower }} on {{ p.slot.on.strftime('%A') }}.
+    <a href="{{ url_for('session_detail', week=wk, sid=p.session.id) }}#result"><b>Enter your result</b></a> so your zones update.</div>
+{% endfor %}
+
 {% if ready and ready.level != 'unknown' %}
 <section class="ready ready-{{ ready.level }}" aria-label="Recovery check">
   <div class="row" style="justify-content:space-between">
@@ -102,6 +107,18 @@
         </div>
       </div>
     {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if plan_next %}
+    <div class="empty" style="margin-top:24px;text-align:left;padding:18px 20px">
+      <b>Next week isn't planned yet</b>
+      <p class="small muted" style="margin:4px 0 12px">Plan it now and it's sized from what you actually did this week. You can change it later.</p>
+      <form method="post" action="{{ url_for('plan_week') }}">
+        <input type="hidden" name="token" value="{{ token }}">
+        <input type="hidden" name="week" value="{{ plan_next }}">
+        <button class="primary">Plan the week of {{ plan_next.strftime('%d %b') }}</button>
+      </form>
     </div>
   {% endif %}
 

@@ -29,7 +29,7 @@ LOW_RESPONSE = 0.70
 LOG_COLUMNS = [
     "on", "week", "session_id", "discipline", "slot_key", "planned_min",
     "status", "reason", "actual_min", "pain", "source", "week_type",
-    "avg_hr", "avg_power", "distance_m", "activity_id",
+    "avg_hr", "avg_power", "distance_m", "activity_id", "rpe",
 ]
 
 
@@ -51,8 +51,17 @@ class LogRow(BaseModel):
     avg_power: int | None = None
     distance_m: int | None = None
     activity_id: str = ""
+    # How hard it felt, 1 (very easy) to 10 (maximal). Optional.
+    rpe: int | None = None
 
-    @field_validator("avg_hr", "avg_power", "distance_m", mode="before")
+    @field_validator("rpe")
+    @classmethod
+    def _rpe_range(cls, v: int | None) -> int | None:
+        if v is not None and not 1 <= v <= 10:
+            raise ValueError(f"effort {v} should be between 1 and 10")
+        return v
+
+    @field_validator("avg_hr", "avg_power", "distance_m", "rpe", mode="before")
     @classmethod
     def _blank_metric(cls, v: object) -> object:
         return None if v in (None, "") else v
@@ -97,6 +106,11 @@ class LogRow(BaseModel):
     @property
     def completed_min(self) -> int:
         return self.actual_min if self.status in ("done", "moved") else 0
+
+    @property
+    def load(self) -> int | None:
+        """Session load = minutes × effort (the 'session-RPE' method). None if unrated."""
+        return self.completed_min * self.rpe if self.rpe and self.completed_min else None
 
 
 def read_log(path: str | Path) -> list[LogRow]:
