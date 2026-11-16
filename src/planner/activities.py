@@ -81,7 +81,7 @@ def _watch_rpe(raw: object) -> int | None:
     """Garmin stores perceived effort as 10–100 (10 per point); we use 1–10."""
     if not isinstance(raw, int | float) or isinstance(raw, bool) or raw <= 0:
         return None
-    value = round(raw / 10) if raw > 10 else round(raw)
+    value = round(raw / 10) if raw >= 10 else round(raw)  # Garmin's 10 means 1/10
     return value if 1 <= value <= 10 else None
 
 

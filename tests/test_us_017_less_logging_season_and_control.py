@@ -25,7 +25,8 @@ SPORT = {"run": 1, "bike": 2, "swim": 5, "strength": 10}
 
 
 def make_fit(start: datetime, sport: str, minutes: float, *, km: float | None = None,
-             hr: int | None = None, watts: int | None = None) -> bytes:
+             hr: int | None = None, watts: int | None = None,
+             rpe: int | None = None) -> bytes:
     """A minimal FIT activity file, as a watch would record it (start in London time)."""
     from fit_tool.fit_file_builder import FitFileBuilder
     from fit_tool.profile.messages.file_id_message import FileIdMessage
@@ -53,6 +54,8 @@ def make_fit(start: datetime, sport: str, minutes: float, *, km: float | None = 
         s.avg_heart_rate = hr
     if watts:
         s.avg_power = watts
+    if rpe:
+        s.workout_rpe = rpe  # as the watch stores it: 10 per point
     b = FitFileBuilder(auto_define=True)
     b.add(fid)
     b.add(s)
