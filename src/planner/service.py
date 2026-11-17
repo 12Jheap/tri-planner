@@ -548,7 +548,8 @@ class Workspace:
         history = FitnessLog(self.out / "fitness.jsonl").rows()
         out = []
         for sport in FITNESS_SPORTS:
-            rows = [h for h in history if h["sport"] == sport]
+            rows = [{**h, "on": date.fromisoformat(h["on"])} for h in history
+                    if h["sport"] == sport]
             for prev, cur in pairwise(rows):
                 faster = cur["value"] < prev["value"] if sport != "bike" \
                     else cur["value"] > prev["value"]
@@ -561,7 +562,9 @@ class Workspace:
                 "tested": self.cfg.profile.tested.get(sport),
                 "can_test": can_test(self.cfg, sport), "enabled": self.cfg.fitness_tests,
                 "due": due, "due_now": known is None or (due is not None and due <= today),
-                "history": list(reversed(rows)),
+                # The latest result is the number in use; its trend is vs the one before.
+                "trend": rows[-1].get("trend", "first") if rows else None,
+                "history": list(reversed(rows))[1:],  # earlier results, newest first
             })
         return out
 

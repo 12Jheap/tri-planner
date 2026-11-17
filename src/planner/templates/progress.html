@@ -8,16 +8,19 @@
 <p class="small muted" style="max-width:62ch">The three numbers every target comes from. A test is planned when one is missing or 8 weeks old{{ '' if fitness[0].enabled else ' (switched off on Profile)' }}.</p>
 <table class="data">
   <tr><th>Number</th><th>Now</th><th>Measured</th><th>Next test</th></tr>
+  {% set trend_words = {'better': 'faster', 'worse': 'slower', 'same': 'same', 'first': 'first test'} %}
+  {% set bike_words = {'better': 'stronger', 'worse': 'lower', 'same': 'same', 'first': 'first test'} %}
   {% for f in fitness %}
+    {% set words = bike_words if f.sport == 'bike' else trend_words %}
     <tr>
       <td class="zname"><span class="sport s-{{ f.sport }}" style="font-size:12px">{{ f.name }}</span></td>
-      <td>{{ f.current or '—' }}</td>
-      <td class="muted">{{ f.tested.strftime('%d %b %Y') if f.tested else ('not dated' if f.current else 'never') }}</td>
+      <td class="tnum" style="white-space:nowrap">{{ f.current or '—' }}</td>
+      <td class="muted">{{ f.tested.strftime('%d %b %Y') if f.tested else ('not dated' if f.current else 'never') }}{% if f.trend %} · {{ words[f.trend] }}{% endif %}</td>
       <td class="muted">{% if not f.can_test %}can't measure here{% elif not f.enabled %}off{% elif f.due_now %}<b style="color:var(--ink)">due</b>{% else %}{{ f.due.strftime('%d %b') }}{% endif %}</td>
     </tr>
-    {% for h in f.history[:4] %}
-      <tr class="hist"><td></td><td class="tnum">{{ h.text }}</td><td class="muted">{{ h.on }}</td>
-        <td class="muted">{{ {'better': 'faster' if f.sport != 'bike' else 'stronger', 'worse': 'slower' if f.sport != 'bike' else 'lower', 'same': 'same'}.get(h.trend, 'first test') }}</td></tr>
+    {% for h in f.history[:3] %}
+      <tr class="hist"><td class="muted small">{{ 'earlier' if loop.first }}</td><td class="tnum" style="white-space:nowrap">{{ h.text }}</td>
+        <td class="muted">{{ h.on.strftime('%d %b %Y') }} · {{ words[h.get('trend', 'first')] }}</td><td></td></tr>
     {% endfor %}
   {% endfor %}
 </table>

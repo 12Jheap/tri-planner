@@ -192,7 +192,12 @@ class FitnessLog:
 
     def append(self, on: date, sport: str, value: int, text: str,
                values: Mapping[str, str]) -> None:
+        """Add a result. Entering the same test again (same sport, same day) corrects it."""
+        rows = [r for r in self.rows() if (r["sport"], r["on"]) != (sport, on.isoformat())]
+        rows.append({"on": on.isoformat(), "sport": sport, "value": value, "text": text,
+                     "entered": dict(values)})
+        rows.sort(key=lambda r: r["on"])
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.path, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps({"on": on.isoformat(), "sport": sport, "value": value,
-                                 "text": text, "entered": dict(values)}) + "\n")
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        tmp.replace(self.path)

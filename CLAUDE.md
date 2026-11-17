@@ -6,11 +6,14 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
 
 ## Context
 - `docs/design.md` — verdict, positioning, phase plan with go/kill gates
-- `docs/prd.md` — user stories (v0 = US-001..006, US-014..021; v1 hosted app = US-007..013)
-- `docs/acceptance-contract.md` — AC-001..AC-096; AC-001..027 and AC-055..096 verified
+- `docs/prd.md` — user stories (v0 = US-001..006, US-014..025; v1 hosted app = US-007..013)
+- `docs/roadmap.md` — what's done, what's next before the gate, what waits for v1
+- `docs/server.md` — running it always-on on a spare Windows laptop
+- `docs/acceptance-contract.md` — AC-001..AC-108; AC-001..027 and AC-055..108 verified
   (US-014 usability, US-015 web app, US-016 sessions, US-017 import/season/move,
   US-018 strength opt-out, auto-sync, recovery check, Garmin HR, effort check, US-019 half,
-  US-020 season = plan volume, race-specific half workouts, US-021 short slots + spread week)
+  US-020 season = plan volume, race-specific half workouts, US-021 short slots + spread week,
+  US-022 home server, US-023 fitness tests, US-024 effort + load, US-025 week review + nudge)
 - `docs/competitor-research.md` — competitor matrix and sources
 
 ## Scope rules
@@ -27,7 +30,9 @@ are and what kit/facilities are open* raises **completed ÷ planned hours**.
   + slot filling), adherence,
   replan, store (append-only JSONL + injuries), export (.ics/.FIT), report,
   activities (FIT import + matching to the plan), garmin (Personal API sync),
-  wellness (sleep/HRV/resting HR -> recovery check, plain rules),
+  wellness (sleep/HRV/resting HR -> recovery check, plain rules), fitness (tests due every
+  8 weeks, test sessions, results -> profile), load (minutes x RPE; a very hard week holds the
+  next one's volume inside `volume_chain`), review (end-of-week review), backup (daily zips),
   friendly (plain-English CLI inputs), wizard (`init`), service (shared actions: the CLI
   and the web app both call `Workspace`), web (Flask app, templates/, static/), cli
 - `tri-plan web` is a local, single-athlete site. It is not v1: no accounts, hosting or payments.

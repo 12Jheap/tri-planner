@@ -725,6 +725,98 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 - **Evidence:** `tests/test_us_021_spread_the_week.py::test_ac_095_a_school_week_spreads_out_instead_of_piling_onto_the_weekend` (pytest, 1 Nov 2026)
 - **Verified-by:** pytest
 
+### US-022: Run it as a home server you can trust (v0)
+
+#### AC-097: A backup zip of your settings and history is written once a day when the site is used (newest 14 kept), can be downloaded from Profile and made with `tri-plan backup`; it never holds the Garmin key, old backups or the server log
+- **Method:** e2e-test
+- **Test:** `tests/test_us_022_home_server.py` > test_ac_097_your_data_is_backed_up_every_day
+- **Status:** verified
+- **Evidence:** `tests/test_us_022_home_server.py::test_ac_097_your_data_is_backed_up_every_day` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-098: `tri-plan web` serves with a production server (waitress) when it's installed and falls back to Flask's when it isn't, writing a backup as it starts; Windows start and update scripts are included; the site can be added to a phone's home screen (manifest + icons); Profile shows the running version
+- **Method:** integration-test
+- **Test:** `tests/test_us_022_home_server.py` > test_ac_098_it_runs_as_a_proper_server_and_installs_like_an_app
+- **Status:** verified
+- **Evidence:** `tests/test_us_022_home_server.py::test_ac_098_it_runs_as_a_proper_server_and_installs_like_an_app` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-099: The site offers one calendar link to subscribe to: it holds last week, this week and every planned week after, and reflects re-plans and moved sessions without downloading anything again
+- **Method:** e2e-test
+- **Test:** `tests/test_us_022_home_server.py` > test_ac_099_one_calendar_link_always_shows_the_current_plan
+- **Status:** verified
+- **Evidence:** `tests/test_us_022_home_server.py::test_ac_099_one_calendar_link_always_shows_the_current_plan` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
+### US-023: Fitness tests keep your zones current (v0)
+
+#### AC-100: A fitness test is planned when a number is missing or 8+ weeks old, in place of that sport's quality session; at most two in a week; never in a recovery, taper, race or time-only week, for a paused sport, for something you can't measure, or when switched off
+- **Method:** e2e-test
+- **Test:** `tests/test_us_023_fitness_tests.py` > test_ac_100_a_test_is_planned_when_a_number_is_missing_or_stale
+- **Status:** verified
+- **Evidence:** `tests/test_us_023_fitness_tests.py::test_ac_100_a_test_is_planned_when_a_number_is_missing_or_stale` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-101: Test sessions are real protocols (a 5 km time trial as a distance step, a 20-minute all-out bike test, a 400 m + 200 m swim test) and only go where they can be measured: a pool for the swim, the wattbike for power
+- **Method:** integration-test
+- **Test:** `tests/test_us_023_fitness_tests.py` > test_ac_101_test_sessions_are_proper_tests_in_the_right_place
+- **Status:** verified
+- **Evidence:** `tests/test_us_023_fitness_tests.py::test_ac_101_test_sessions_are_proper_tests_in_the_right_place` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-102: After a test, Today asks for the result; saving it updates the number (CSS from the 400 m and 200 m times, FTP as 95% of the 20-minute power), the date measured, your zones, the history and this week's calendar and watch files; a bad result changes nothing; the next test is due 8 weeks later
+- **Method:** e2e-test
+- **Test:** `tests/test_us_023_fitness_tests.py` > test_ac_102_entering_a_result_updates_zones_everywhere
+- **Status:** verified
+- **Evidence:** `tests/test_us_023_fitness_tests.py::test_ac_102_entering_a_result_updates_zones_everywhere` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-103: Changing a fitness number on Profile counts as measuring it today (unchanged numbers keep their dates), and fitness tests can be switched off there
+- **Method:** e2e-test
+- **Test:** `tests/test_us_023_fitness_tests.py` > test_ac_103_profile_edits_are_dated_and_tests_can_be_switched_off
+- **Status:** verified
+- **Evidence:** `tests/test_us_023_fitness_tests.py::test_ac_103_profile_edits_are_dated_and_tests_can_be_switched_off` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
+### US-024: Effort and training load (v0)
+
+#### AC-104: Marking a session done asks how hard it felt (1-10, optional); a session logged without it can be rated later with one tap; the command line takes --effort; anything outside 1-10 is refused
+- **Method:** e2e-test
+- **Test:** `tests/test_us_024_effort_and_load.py` > test_ac_104_effort_is_asked_when_you_log_and_can_be_added_later
+- **Status:** verified
+- **Evidence:** `tests/test_us_024_effort_and_load.py::test_ac_104_effort_is_asked_when_you_log_and_can_be_added_later` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-105: If you answer the watch's "how did that feel?" question, that effort score arrives with the imported activity (Garmin's 10-100 scale becomes 1-10); an activity without one leaves effort blank
+- **Method:** integration-test
+- **Test:** `tests/test_us_024_effort_and_load.py` > test_ac_105_the_watchs_effort_score_comes_in_with_the_activity
+- **Status:** verified
+- **Evidence:** `tests/test_us_024_effort_and_load.py::test_ac_105_the_watchs_effort_score_comes_in_with_the_activity` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-106: A week's load is minutes x effort (unrated sessions count at the week's average and it says so); a jump of more than 30% on recent weeks is flagged; a week that felt very hard (average 7.5+ over at least 3 rated sessions) makes the next week hold its volume instead of adding 10%, on Season and in the plan alike, with a note saying why
+- **Method:** e2e-test
+- **Test:** `tests/test_us_024_effort_and_load.py` > test_ac_106_a_very_hard_week_holds_the_next_one
+- **Status:** verified
+- **Evidence:** `tests/test_us_024_effort_and_load.py::test_ac_106_a_very_hard_week_holds_the_next_one` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
+### US-025: A weekly rhythm: review the week, plan the next (v0)
+
+#### AC-107: From Friday, Today offers to plan next week if it isn't planned yet (one tap); not earlier in the week, not once it's planned, and not when you're looking at another day
+- **Method:** e2e-test
+- **Test:** `tests/test_us_025_weekly_rhythm.py` > test_ac_107_from_friday_today_offers_to_plan_next_week
+- **Status:** verified
+- **Evidence:** `tests/test_us_025_weekly_rhythm.py::test_ac_107_from_friday_today_offers_to_plan_next_week` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
+#### AC-108: Once a week is over (or on its Sunday) the Week page reviews it: share of planned time done, key sessions done, each sport, average effort, what was skipped and why, one plain verdict, and a button to plan next week; if too little is logged it says it can't judge
+- **Method:** e2e-test
+- **Test:** `tests/test_us_025_weekly_rhythm.py` > test_ac_108_a_finished_week_gets_an_honest_review
+- **Status:** verified
+- **Evidence:** `tests/test_us_025_weekly_rhythm.py::test_ac_108_a_finished_week_gets_an_honest_review` (pytest, 17 Nov 2026)
+- **Verified-by:** pytest
+
 ## Verification Summary
 | ID | Criterion | Method | Status | Evidence |
 |----|-----------|--------|--------|----------|
@@ -824,7 +916,19 @@ Session: triathlon-app-like-runna-20261030-1759 | PRD: prd.md | Status: locked
 | AC-094 | A session too long for a slot can run there shortened, down … | unit-test | verified | test_us_021_spread_the_week.py |
 | AC-095 | On a timetable of short weekday slots and long weekends, wee… | e2e-test | verified | test_us_021_spread_the_week.py |
 | AC-096 | With no settings file or a broken one (and the real clock, a… | e2e-test | verified | test_us_015_local_web_app.py |
+| AC-097 | A backup zip of your settings and history is written once a… | e2e-test | verified | test_us_022_home_server.py |
+| AC-098 | `tri-plan web` serves with a production server (waitress) wh… | integration-test | verified | test_us_022_home_server.py |
+| AC-099 | The site offers one calendar link to subscribe to: it holds… | e2e-test | verified | test_us_022_home_server.py |
+| AC-100 | A fitness test is planned when a number is missing or 8+ wee… | e2e-test | verified | test_us_023_fitness_tests.py |
+| AC-101 | Test sessions are real protocols (a 5 km time trial as a dis… | integration-test | verified | test_us_023_fitness_tests.py |
+| AC-102 | After a test, Today asks for the result; saving it updates t… | e2e-test | verified | test_us_023_fitness_tests.py |
+| AC-103 | Changing a fitness number on Profile counts as measuring it… | e2e-test | verified | test_us_023_fitness_tests.py |
+| AC-104 | Marking a session done asks how hard it felt (1-10, optional… | e2e-test | verified | test_us_024_effort_and_load.py |
+| AC-105 | If you answer the watch's "how did that feel?" question, tha… | integration-test | verified | test_us_024_effort_and_load.py |
+| AC-106 | A week's load is minutes x effort (unrated sessions count at… | e2e-test | verified | test_us_024_effort_and_load.py |
+| AC-107 | From Friday, Today offers to plan next week if it isn't plan… | e2e-test | verified | test_us_025_weekly_rhythm.py |
+| AC-108 | Once a week is over (or on its Sunday) the Week page reviews… | e2e-test | verified | test_us_025_weekly_rhythm.py |
 
-Progress: 69/96 verified — v0 (AC-001–AC-027, AC-055–AC-096) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
+Progress: 81/108 verified — v0 (AC-001–AC-027, AC-055–AC-108) complete; v1 (AC-028–AC-054) pending until the July 2027 gate
 
 GitHub issue: not created — no repository linked to this session.

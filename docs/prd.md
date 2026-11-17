@@ -190,6 +190,40 @@ Half-iron races require athletes to be 18 on race day; the app says so where the
 - [ ] A session too long for a slot can run there shortened, down to its sensible minimum (a Key session that fits nowhere at all is rescued shorter with a note); full length is used whenever it fits, and the shortened workout still adds up
 - [ ] On a timetable of short weekday slots and long weekends, weekday slots are used, quality sessions go midweek, the long ride and long run take different weekend days, and no weekend day carries two long sessions or more than its fair share plus the long session
 
+### US-022: Run it as a home server you can trust
+**Description:** As an athlete running the planner on an old laptop at home, I want my data backed up, a proper server, a calendar that keeps itself current and an icon on my phone, so it behaves like an app I can rely on.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] A backup zip of your settings and history is written once a day when the site is used (newest 14 kept), can be downloaded from Profile and made with `tri-plan backup`; it never holds the Garmin key, old backups or the server log
+- [ ] `tri-plan web` serves with a production server (waitress) when it's installed and falls back to Flask's when it isn't, writing a backup as it starts; Windows start and update scripts are included; the site can be added to a phone's home screen (manifest + icons); Profile shows the running version
+- [ ] The site offers one calendar link to subscribe to: it holds last week, this week and every planned week after, and reflects re-plans and moved sessions without downloading anything again
+
+### US-023: Fitness tests keep your zones current
+**Description:** As an athlete, I want the plan to test my fitness every 8 weeks (and straight away when a number is missing), so my paces, power and HR targets keep up with me instead of going stale.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] A fitness test is planned when a number is missing or 8+ weeks old, in place of that sport's quality session; at most two in a week; never in a recovery, taper, race or time-only week, for a paused sport, for something you can't measure, or when switched off
+- [ ] Test sessions are real protocols (a 5 km time trial as a distance step, a 20-minute all-out bike test, a 400 m + 200 m swim test) and only go where they can be measured: a pool for the swim, the wattbike for power
+- [ ] After a test, Today asks for the result; saving it updates the number (CSS from the 400 m and 200 m times, FTP as 95% of the 20-minute power), the date measured, your zones, the history and this week's calendar and watch files; a bad result changes nothing; the next test is due 8 weeks later
+- [ ] Changing a fitness number on Profile counts as measuring it today (unchanged numbers keep their dates), and fitness tests can be switched off there
+
+### US-024: Effort and training load
+**Description:** As an athlete, I want to say how hard each session felt (or have my watch say it), so the plan sees what a week took out of me and holds back after a very hard one.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] Marking a session done asks how hard it felt (1-10, optional); a session logged without it can be rated later with one tap; the command line takes --effort; anything outside 1-10 is refused
+- [ ] If you answer the watch's "how did that feel?" question, that effort score arrives with the imported activity (Garmin's 10-100 scale becomes 1-10); an activity without one leaves effort blank
+- [ ] A week's load is minutes x effort (unrated sessions count at the week's average and it says so); a jump of more than 30% on recent weeks is flagged; a week that felt very hard (average 7.5+ over at least 3 rated sessions) makes the next week hold its volume instead of adding 10%, on Season and in the plan alike, with a note saying why
+
+### US-025: A weekly rhythm: review the week, plan the next
+**Description:** As an athlete, I want an honest look back at each week and a nudge to plan the next one, so the weekly loop happens without me having to remember it.
+**Agent:** Advocate
+**Acceptance Criteria:**
+- [ ] From Friday, Today offers to plan next week if it isn't planned yet (one tap); not earlier in the week, not once it's planned, and not when you're looking at another day
+- [ ] Once a week is over (or on its Sunday) the Week page reviews it: share of planned time done, key sessions done, each sport, average effort, what was skipped and why, one plain verdict, and a button to plan next week; if too little is logged it says it can't judge
+
+Note: US-022..025 were chosen as the next steps after US-021 (17 Nov 2026); see `docs/roadmap.md`.
+
 ### v1 — MVP web app (only if gates pass)
 
 ### US-007: 3-minute onboarding to week-1 preview

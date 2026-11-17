@@ -33,7 +33,8 @@ pool's open), and when you're free each day. Then:
 - **Week**: the whole week. Plan it, download the calendar file and Garmin workouts.
 - **Changed**: tick the slots you can't make, pause a sport for an injury, or say you're
   back. It re-plans the rest of the week and shows what moved and why.
-- **Progress**: completion per week and per sport, and which slots you actually train in.
+- **Progress**: your fitness numbers and test history, completion and training load per
+  week and per sport, and which slots you actually train in.
 - **Setup**: change anything, including holiday/exam dates. There's an advanced editor for
   the raw file too.
 
@@ -41,6 +42,9 @@ pool's open), and when you're free each day. Then:
 (Mac: System Settings → Wi-Fi → Details; Windows: `ipconfig`), and open
 `http://<that IP>:8000` on your phone while it's on the same wifi. Add it to your
 home screen. Only do this on wifi you trust, because anyone on it can open the page.
+
+**Always on:** to run it on a spare laptop with the screen off (auto-start, firewall,
+reaching it away from home with Tailscale, updating, backups), follow `docs/server.md`.
 
 The website and the commands below use the same files, so you can mix them.
 
@@ -171,6 +175,21 @@ you to be 18 on race day.
 Effort, when there's no number: 3–4/10 easy (full sentences), 6–7/10 tempo (short
 sentences), 7–8/10 threshold (a few words), 9/10 VO2.
 
+**Fitness tests.** When a number is missing, or was measured 8+ weeks ago, the plan swaps
+that sport's quality session for a test: a 5 km time trial, a 20-minute FTP test (FTP is
+95% of the average power) or a 400 m + 200 m swim test (gives CSS). At most two in a week,
+never in a recovery, taper or race week. Enter the result on the session page (Today asks)
+and every zone, calendar entry and watch file updates. Switch tests off on Profile.
+
+**Effort and load.** When you mark a session done, tap how hard it felt (1–10), or answer
+the watch's "how did that feel?" and it comes in with the sync. Load = minutes × effort.
+Progress flags a week that jumps 30%+ on your recent ones, and if a week felt very hard
+(average 7.5+ over 3+ rated sessions) the next one holds its volume instead of adding 10%.
+
+**The weekly loop.** Once a week is over (or on Sunday) the Week page reviews it: what you
+did against the plan, key sessions, each sport, what you skipped and why, and one honest
+line. From Friday, Today offers to plan next week.
+
 ## The experiment
 
 `tri-plan week --experiment-start 2026-11-09` alternates facility-aware weeks with
@@ -182,7 +201,10 @@ hold **≥50% for 6 weeks** (term baseline ~15%).
 
 Everything lives in `out/` (change with `--out`):
 `log.csv` (also opens fine in Google Sheets), `plan_session_version.jsonl` (every plan
-version, never overwritten), `injuries.json`, and one folder per week.
+version, never overwritten), `injuries.json`, `fitness.jsonl` (test results), `backups/`
+(one zip a day, newest 14 kept) and one folder per week. `tri-plan backup --to <folder>`
+writes a backup anywhere; Profile has a download button. To restore, unzip it into the
+tri-planner folder.
 
 ## How it works
 
@@ -202,6 +224,10 @@ version, never overwritten), `injuries.json`, and one folder per week.
 - `web.py` + `templates/` + `static/`: the local website (Flask)
 - `export.py`: `.ics` calendar and `.FIT` structured workouts
 - `activities.py` / `garmin.py`: read recorded activities (files or Garmin Personal API) and match them to the plan
+- `fitness.py`: when a fitness test is due, the test sessions, and turning a result into new numbers
+- `load.py`: weekly training load (minutes × effort) and the "very hard week" rule
+- `review.py`: the end-of-week review
+- `backup.py`: daily backup zips
 - `report.py`: experiment schedule and completion report
 
 ## Quality gates
@@ -211,4 +237,5 @@ pip install -e ".[fit,web,garmin,dev]"
 pytest && ruff check . && mypy src
 ```
 
-66 acceptance tests, one per criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–093).
+Every criterion in `docs/acceptance-contract.md` (AC-001–027, AC-055–108) has a test named
+after it. What's next: `docs/roadmap.md`.

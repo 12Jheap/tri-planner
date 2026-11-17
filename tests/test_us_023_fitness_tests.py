@@ -165,10 +165,15 @@ def test_ac_102_entering_a_result_updates_zones_everywhere(tmp_path):
     assert ws.pending_results(now.date()) == []
 
     assert ws.record_test("bike", {"p20": "240"}, now.date()).after == "228 W"  # 95% of 240
-    change = ws.record_test("run", {"time": "22:40"}, now.date())
+    change = ws.record_test("run", {"time": "22:40"}, day)
     assert change.before == "23:15" and change.after == "22:40" and "/km" in change.zone_line
     assert ws.cfg.profile.run_5k == 22 * 60 + 40
-    ws.record_test("run", {"time": "22:10"}, now.date())
+    ws.record_test("run", {"time": "22:00"}, now.date())
+    ws.record_test("run", {"time": "22:10"}, now.date())  # same day again: a correction
+    run = ws.fitness_status(now.date())[1]
+    assert run["current"] == "22:10" and run["trend"] == "better"
+    assert [h["text"] for h in run["history"]] == ["22:40"]  # the 22:00 typo is gone
+    assert ws.cfg.profile.run_5k == 22 * 60 + 10
     progress = client.get("/progress").get_data(as_text=True)
     assert "Fitness" in progress and "1:50/100m" in progress and "22:10" in progress
     assert "faster" in progress and "first test" in progress
